@@ -40,9 +40,20 @@ defmodule StarterKit.Privacy do
     user_id |> memberships_of() |> Enum.find_value(&blocker(&1, user_id))
   end
 
+  @doc "Account deletion preview for the settings API."
+  def account_deletion(scope) do
+    blocker =
+      case deletion_blocker(scope) do
+        {reason, organization} -> %{reason: reason, organization: organization.name}
+        nil -> nil
+      end
+
+    %{blocker: blocker}
+  end
+
   @doc """
   Deletes the scope's user (`Accounts.delete_user/1`) and the organizations left empty.
-  `{:error, :transfer_ownership | :subscription_active}` when `deletion_blocker/1` finds a
+  `{:error, {reason, organization_name}}` when `deletion_blocker/1` finds a
   reason; nothing is written then.
   """
   def delete_account(%Scope{user: %User{id: user_id}} = scope) do
@@ -53,8 +64,8 @@ defmodule StarterKit.Privacy do
       memberships = memberships_of(user_id)
 
       case Enum.find_value(memberships, &blocker(&1, user_id)) do
-        {reason, _organization} ->
-          {:error, reason}
+        {reason, organization} ->
+          {:error, {reason, organization.name}}
 
         nil ->
           delete_with_orphans(scope, memberships)

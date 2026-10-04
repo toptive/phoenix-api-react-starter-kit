@@ -140,6 +140,19 @@ defmodule StarterKitWeb.ApiAuth do
     })
   end
 
+  def error(conn, {:email_unchanged, changeset}),
+    do:
+      Responses.render_error(
+        conn,
+        409,
+        :email_unchanged,
+        StarterKit.I18n.validation_details(changeset, Responses.locale(conn))
+      )
+
+  def error(conn, {reason, organization})
+      when reason in [:transfer_ownership, :subscription_active],
+      do: Responses.render_error(conn, 409, reason, %{organization: organization})
+
   def error(conn, reason) do
     status =
       case reason do

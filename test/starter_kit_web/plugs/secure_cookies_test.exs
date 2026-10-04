@@ -12,7 +12,7 @@ defmodule StarterKitWeb.Plugs.SecureCookiesTest do
     Application.put_env(:starter_kit, :secure_cookies, true)
 
     cookies =
-      conn |> log_in_user(user_fixture()) |> get(~p"/settings/profile/edit") |> set_cookies()
+      conn |> log_in_user(user_fixture()) |> get(~p"/settings/appearance/edit") |> set_cookies()
 
     assert Enum.any?(cookies, &String.starts_with?(&1, "XSRF-TOKEN="))
     assert Enum.any?(cookies, &String.starts_with?(&1, "_starter_kit_key="))
@@ -21,7 +21,7 @@ defmodule StarterKitWeb.Plugs.SecureCookiesTest do
 
   test "off by default (dev and test run on plain HTTP)", %{conn: conn} do
     cookies =
-      conn |> log_in_user(user_fixture()) |> get(~p"/settings/profile/edit") |> set_cookies()
+      conn |> log_in_user(user_fixture()) |> get(~p"/settings/appearance/edit") |> set_cookies()
 
     refute Enum.any?(cookies, &(&1 =~ ~r/;\s*secure/i))
   end

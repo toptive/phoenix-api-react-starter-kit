@@ -117,18 +117,7 @@ defmodule StarterKitWeb.Router do
     resources "/dashboard", DashboardController, only: [:show], singleton: true
 
     scope "/settings", Settings, as: :settings do
-      resources "/profile", ProfileController, only: [:edit, :update], singleton: true
       resources "/appearance", AppearanceController, only: [:edit], singleton: true
-
-      resources "/email-preferences", EmailPreferenceController,
-        only: [:edit, :update],
-        singleton: true
-
-      resources "/sessions", SessionController, only: [:index, :delete]
-
-      resources "/email-confirmations", EmailConfirmationController,
-        only: [:show, :create],
-        param: "token"
 
       resources "/billing", BillingController, only: [:show], singleton: true
 
@@ -140,15 +129,6 @@ defmodule StarterKitWeb.Router do
         only: [:create],
         singleton: true
     end
-  end
-
-  # Sensitive settings need a recent sign-in (sudo mode).
-  scope "/settings", StarterKitWeb.Settings, as: :settings do
-    pipe_through [:browser, :authenticated, :require_sudo_mode]
-
-    resources "/email", EmailController, only: [:edit, :update], singleton: true
-    resources "/password", PasswordController, only: [:edit, :update], singleton: true
-    resources "/account", AccountController, only: [:edit, :delete], singleton: true
   end
 
   # Superadmin area.
@@ -229,6 +209,17 @@ defmodule StarterKitWeb.Router do
     post "/invitations/:token/acceptance", InvitationAcceptanceController, :create
 
     scope "/settings", Settings, as: :settings do
+      put "/profile", ProfileController, :update
+      get "/email-preferences", EmailPreferenceController, :show
+      put "/email-preferences", EmailPreferenceController, :update
+      get "/sessions", SessionController, :index
+      delete "/sessions/:id", SessionController, :delete
+      put "/email", EmailController, :update
+      get "/email-confirmations/:token", EmailConfirmationController, :show
+      post "/email-confirmations", EmailConfirmationController, :create
+      put "/password", PasswordController, :update
+      get "/account", AccountController, :show
+      delete "/account", AccountController, :delete
       get "/organization", OrganizationController, :show
       put "/organization", OrganizationController, :update
       get "/members", MembershipController, :index

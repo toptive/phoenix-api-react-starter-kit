@@ -65,6 +65,11 @@ defmodule StarterKit.Accounts.User do
 
   @doc "Changeset for the email preferences page (optional mail on or off)."
   def email_preferences_changeset(user, attrs) do
+    attrs =
+      attrs
+      |> Map.new(fn {key, value} -> {to_string(key), value} end)
+      |> Map.put_new("optional_emails", nil)
+
     user
     |> cast(attrs, [:optional_emails])
     |> validate_required([:optional_emails])
@@ -107,7 +112,9 @@ defmodule StarterKit.Accounts.User do
     |> validate_length(:name, max: 120)
   end
 
-  defp validate_locale(changeset), do: validate_inclusion(changeset, :locale, @locales)
+  defp validate_locale(changeset) do
+    changeset |> validate_required([:locale]) |> validate_inclusion(:locale, @locales)
+  end
 
   defp validate_email(changeset, opts) do
     changeset =
@@ -126,7 +133,10 @@ defmodule StarterKit.Accounts.User do
   end
 
   defp validate_email_changed(changeset) do
-    if get_field(changeset, :email) && get_change(changeset, :email) == nil do
+    email = get_field(changeset, :email)
+
+    if changeset.valid? and is_binary(email) and is_binary(changeset.data.email) and
+         String.downcase(email) == String.downcase(changeset.data.email) do
       add_error(changeset, :email, "validation.email_unchanged")
     else
       changeset
@@ -143,14 +153,14 @@ defmodule StarterKit.Accounts.User do
   def password_changeset(user, attrs, opts \\ []) do
     user
     |> cast(attrs, [:password])
-    |> validate_confirmation(:password, message: "validation.password_mismatch")
+    |> validate_confirmation(:password, required: true, message: "validation.password_mismatch")
     |> validate_password(opts)
   end
 
   defp validate_password(changeset, opts) do
     changeset
     |> validate_required([:password])
-    |> validate_length(:password, min: 12, max: 72)
+    |> validate_length(:password, min: 12, max: 72, count: :bytes)
     |> maybe_hash_password(opts)
   end
 

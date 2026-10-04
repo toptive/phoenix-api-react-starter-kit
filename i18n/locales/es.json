@@ -549,5 +549,8 @@
   "errors.api.email_not_verified": "Google no verificó tu dirección de email.",
   "errors.api.state_invalid": "Este intento de ingreso venció. Probá de nuevo.",
   "validation.limit_reached": "Este plan permite hasta {{limit}} personas.",
-  "errors.api.method_not_allowed": "Este método de solicitud no está permitido."
+  "errors.api.method_not_allowed": "Este método de solicitud no está permitido.",
+  "errors.api.email_unchanged": "Este ya es tu email.",
+  "errors.api.transfer_ownership": "Nombra a otra persona como dueña antes de eliminar tu cuenta.",
+  "errors.api.subscription_active": "Cancela el plan de pago antes de eliminar tu cuenta."
 }

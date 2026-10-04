@@ -2,18 +2,22 @@
 
 import { buildUrl, type RouteDefinition, type RouteOptions } from "./runtime";
 
-export const settingsEmailConfirmation = {
-  /** POST /settings/email-confirmations */
+export const apiV1SettingsEmailConfirmation = {
+  /** POST /api/v1/settings/email-confirmations */
   create: (options?: RouteOptions): RouteDefinition<"post"> => ({
-    url: buildUrl("/settings/email-confirmations", {}, options),
+    url: buildUrl("/api/v1/settings/email-confirmations", {}, options),
     method: "post",
   }),
-  /** GET /settings/email-confirmations/:token */
+  /** GET /api/v1/settings/email-confirmations/:token */
   show: (
     params: { token: string | number } | string | number,
     options?: RouteOptions,
   ): RouteDefinition<"get"> => ({
-    url: buildUrl("/settings/email-confirmations/:token", params, options),
+    url: buildUrl(
+      "/api/v1/settings/email-confirmations/:token",
+      params,
+      options,
+    ),
     method: "get",
   }),
 } as const;

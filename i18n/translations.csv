@@ -550,3 +550,6 @@
 "errors.api.state_invalid","This sign-in attempt has expired. Try again.","Este intento de ingreso venció. Probá de nuevo."
 "validation.limit_reached","This plan allows up to {{limit}} people.","Este plan permite hasta {{limit}} personas."
 errors.api.method_not_allowed,This request method is not allowed.,Este método de solicitud no está permitido.
+errors.api.email_unchanged,This is already your email.,Este ya es tu email.
+errors.api.transfer_ownership,Make someone else an owner before deleting your account.,Nombra a otra persona como dueña antes de eliminar tu cuenta.
+errors.api.subscription_active,Cancel the paid plan before deleting your account.,Cancela el plan de pago antes de eliminar tu cuenta.

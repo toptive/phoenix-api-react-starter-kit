@@ -1,28 +1,8 @@
 defmodule StarterKitWeb.EmailPreferencesTest do
   use StarterKitWeb.ConnCase, async: true
 
-  alias StarterKit.{I18n, Notifications, Repo}
+  alias StarterKit.{I18n, Notifications}
   alias StarterKitWeb.Dev.EmailPreviewController
-
-  describe "settings: email preferences" do
-    setup :register_and_log_in_user
-
-    test "shows the preference and turns optional mail back on", %{conn: conn, user: user} do
-      Repo.update!(Ecto.Changeset.change(user, optional_emails: false))
-
-      page = get(conn, ~p"/settings/email-preferences/edit")
-      assert inertia_component(page) == "settings/email-preferences/edit"
-      assert inertia_props(page).optionalEmails == false
-
-      conn = patch(conn, ~p"/settings/email-preferences", %{"user" => %{"optionalEmails" => true}})
-      assert redirected_to(conn) == ~p"/settings/email-preferences/edit"
-      assert Repo.reload!(user).optional_emails
-    end
-  end
-
-  test "settings: email preferences need a sign-in", %{conn: conn} do
-    assert conn |> get(~p"/settings/email-preferences/edit") |> redirected_to() =~ "/session"
-  end
 
   describe "dev gallery (/dev/emails, dev only)" do
     defp call(action, params) do

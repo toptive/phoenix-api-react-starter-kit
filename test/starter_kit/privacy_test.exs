@@ -23,7 +23,7 @@ defmodule StarterKit.PrivacyTest do
 
     assert {:transfer_ownership, %Organization{id: org_id}} = Privacy.deletion_blocker(scope)
     assert org_id == scope.organization.id
-    assert {:error, :transfer_ownership} = Privacy.delete_account(scope)
+    assert {:error, {:transfer_ownership, _}} = Privacy.delete_account(scope)
     refute deleted?(scope.user)
   end
 
@@ -52,7 +52,7 @@ defmodule StarterKit.PrivacyTest do
     subscription_fixture(scope, %{status: "past_due"})
 
     assert {:subscription_active, _} = Privacy.deletion_blocker(scope)
-    assert {:error, :subscription_active} = Privacy.delete_account(scope)
+    assert {:error, {:subscription_active, _}} = Privacy.delete_account(scope)
     refute deleted?(scope.user)
   end
 

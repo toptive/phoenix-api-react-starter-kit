@@ -71,7 +71,7 @@ public routes. Organization selection belongs to the device session; see [TENANC
 Emailed tokens live in `user_tokens`: a digest, user, context, recipient and insertion timestamp.
 Contexts are `magic_link` (15 minutes) and `change_email:<old address>` (7 days). They are single
 use. The daily `Accounts.TokenCleanupWorker` removes expired emailed tokens and sessions whose
-expiry or revocation is more than thirty days old.
+expiry or revocation is more than thirty days old, and ended impersonations older than ninety days.
 
 ## Sudo and impersonation
 
@@ -81,7 +81,11 @@ password failure gives 401 `invalid_credentials`; a passwordless user's password
 422 `validation_failed` on password (`validation.required`). A magic link must belong to the
 same user, or the request gives 422 `magic_link_invalid` without consuming the other user's link.
 
-Impersonation uses a separate session with no sudo window. Sudo returns 403 `forbidden`.
+Every successful sudo refresh records `user.sudo_authenticated`, including password or magic-link
+sign-in that refreshes the same bearer.
+
+Impersonation uses a separate session with no sudo window and an eight-hour expiry that never
+slides. Sudo returns 403 `forbidden`.
 `DELETE /auth/impersonation` revokes it, ends its impersonation record and audits the stop; the SPA
 restores the admin token it saved. A normal session gets 409 `conflict` when trying to stop
 impersonation. Signing out while impersonating revokes both sessions. Revoking an administrator
@@ -119,6 +123,8 @@ ionic://localhost and http://localhost, with no credentials and no PATCH.
 | Invitations | 30/hour |
 | Invitation acceptance | 10/min |
 | Email opt-out | 120/min |
+| Email confirmation | 10/min |
+| Account deletion | 5/min |
 
 Over-limit responses are 429 `rate_limited`, with both `Retry-After` and `details.retryAfter`.
 All errors are private, no-store and noindex. Turnstile is off by default. When enabled, registration
@@ -129,4 +135,44 @@ Bootstrap exposes only the required flag and public site key.
 `ClientIp` trusts X-Forwarded-For only from configured proxies and CF-Connecting-IP only from a
 Cloudflare hop. Device IP, rate limits and audit events use that resolved peer. Sensitive account
 settings use sudo; account deletion locks organizations and preserves consent/billing history
-according to `StarterKit.Privacy`.
+according to `StarterKit.Privacy`; see [PRIVACY.md](PRIVACY.md).
+
+## Account settings and devices
+
+All settings endpoints require a bearer. The initial profile values come from `bootstrap.auth.user`.
+Unknown body fields are ignored; request and response keys are camelCase.
+
+| Method | Resource under `/api/v1/settings` | Result |
+|---|---|---|
+| PUT | `/profile` | Name (1..120) and supported locale → `User` |
+| GET / PUT | `/email-preferences` | `EmailPreferences {optionalEmails}`; PUT requires a boolean |
+| GET | `/sessions` | Live `Session[]`, newest first, excluding impersonation; `current` marks this device |
+| DELETE | `/sessions/:id` | Revoke an owned device → empty 204, including the current device |
+| PUT | `/email` | Sudo; new address → 202 `EmailChange {email}` |
+| GET | `/email-confirmations/:token` | Non-consuming, user-bound `EmailChange` preview |
+| POST | `/email-confirmations` | User-bound single-use token → updated `User` |
+| PUT | `/password` | Sudo; password and passwordConfirmation → fresh `AuthSession` |
+| GET / DELETE | `/account` | Sudo; blocker preview or account deletion; see [PRIVACY.md](PRIVACY.md) |
+
+Devices never expose tokens or their digests. Another user's device id returns 404. Revocation
+records `session.revoked`; using the revoked token returns 401 `session_expired`. Revoking the
+current device requires the SPA to clear its token. Optional mail changes record
+`user.optional_emails_started` or `user.optional_emails_stopped` only when the value changes.
+The optional-email footer opens `/settings/email-preferences/edit` in the SPA.
+
+Email changes validate format, maximum 160 characters, uniqueness and a different address
+(case-insensitive). An unchanged address returns 409 `email_unchanged`, with an `email` field
+error keyed `validation.email_unchanged`. No mail availability returns 503 before a token is
+written. The `email_change` mail uses the user's locale and goes to the new address, with a
+`PUBLIC_URL/settings/email-confirmations/:token` SPA link. The old address stays active until
+POST confirmation. Peek and apply require the user's bearer but no sudo; the token lasts seven
+days. Unknown, expired, used or another user's tokens return 422 `email_change_invalid`.
+Applying a valid token deletes every change-email token for that user, including older contexts,
+and records `user.email_changed`.
+Magic-link mail opens `PUBLIC_URL/magic-links/:token` in the SPA.
+
+Passwords are 12..72 bytes with matching confirmation. A successful change atomically revokes
+the user's sessions and emailed tokens, including impersonations started by revoked administrator
+sessions. It creates a fresh session for the current device, records `user.password_changed` and
+returns 200 `AuthSession` with a token. The SPA replaces its stored token. Old bearers return
+401 `session_expired`; invalid password input leaves all sessions intact.

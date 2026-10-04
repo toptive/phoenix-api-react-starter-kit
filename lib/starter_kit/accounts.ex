@@ -302,49 +302,84 @@ defmodule StarterKit.Accounts do
   when no mail can be sent.
   """
   def request_email_change(%Scope{user: user}, attrs, url_fun) do
+    attrs =
+      attrs |> Map.new(fn {key, value} -> {to_string(key), value} end) |> Map.put_new("email", nil)
+
     changeset = User.email_changeset(user, attrs)
 
     with :ok <- require_email_delivery(),
          {:ok, applied} <- Ecto.Changeset.apply_action(changeset, :update) do
-      {encoded_token, user_token} =
-        UserToken.build_email_token(applied, "change_email:#{user.email}")
+      enqueue_email_change(applied, user.email, url_fun)
+    else
+      {:error, %Ecto.Changeset{} = changeset} ->
+        if {:email, {"validation.email_unchanged", []}} in changeset.errors,
+          do: {:error, {:email_unchanged, changeset}},
+          else: {:error, changeset}
 
-      Repo.insert!(user_token)
-      Notifications.notify(applied, :email_change, %{url: url_fun.(encoded_token)})
-      {:ok, applied}
+      error ->
+        error
     end
+  end
+
+  defp enqueue_email_change(applied, old_email, url_fun) do
+    {encoded_token, user_token} = UserToken.build_email_token(applied, "change_email:#{old_email}")
+
+    Repo.transact(fn ->
+      with {:ok, _token} <- Repo.insert(user_token),
+           {:ok, _delivery} <-
+             Notifications.notify(applied, :email_change, %{url: url_fun.(encoded_token)}) do
+        {:ok, applied}
+      end
+    end)
   end
 
   @doc """
   The new email behind an email-change link, without using the link (the confirmation
   page shows it; only `update_user_email/2` spends the token). `nil` when invalid.
   """
-  def get_email_change(user, token) do
+  def get_email_change(user, token) when is_binary(token) do
     with {:ok, query} <-
            UserToken.verify_change_email_token_query(token, "change_email:#{user.email}"),
-         %UserToken{sent_to: email} <- Repo.one(query) do
+         %UserToken{sent_to: email} <- Repo.one(where(query, [t], t.user_id == ^user.id)) do
       email
     else
       _ -> nil
     end
   end
 
-  @doc "Changes the email when `token` matches. Expires all change-email tokens."
-  def update_user_email(user, token) do
-    context = "change_email:#{user.email}"
+  def get_email_change(_user, _token), do: nil
 
+  @doc "Previews a change-email link owned by this account."
+  def peek_email_change(%Scope{user: user}, token) do
+    case get_email_change(user, token) do
+      nil -> {:error, :email_change_invalid}
+      email -> {:ok, %{email: email}}
+    end
+  end
+
+  @doc "Changes the email when `token` matches. Expires all change-email tokens."
+  def update_user_email(user, token) when is_binary(token) do
     Repo.transact(fn ->
-      with {:ok, query} <- UserToken.verify_change_email_token_query(token, context),
-           %UserToken{sent_to: email} <- Repo.one(query),
+      user = Repo.one!(from u in User, where: u.id == ^user.id, lock: "FOR UPDATE")
+
+      with {:ok, query} <-
+             UserToken.verify_change_email_token_query(token, "change_email:#{user.email}"),
+           %UserToken{sent_to: email} <- Repo.one(where(query, [t], t.user_id == ^user.id)),
            {:ok, user} <- Repo.update(User.email_changeset(user, %{email: email})),
            {_count, _result} <-
-             Repo.delete_all(from(UserToken, where: [user_id: ^user.id, context: ^context])) do
+             Repo.delete_all(
+               from t in UserToken,
+                 where: t.user_id == ^user.id and like(t.context, "change_email:%")
+             ) do
+        Audit.record("user.email_changed", actor: user, subject: user)
         {:ok, user}
       else
-        _ -> {:error, :invalid_token}
+        _ -> {:error, :email_change_invalid}
       end
     end)
   end
+
+  def update_user_email(_user, _token), do: {:error, :email_change_invalid}
 
   @doc "A password changeset (for forms)."
   def change_user_password(user, attrs \\ %{}, opts \\ []),
@@ -354,8 +389,14 @@ defmodule StarterKit.Accounts do
   Sets a new password and expires every token of the user (all sessions end).
   Returns `{:ok, {user, expired_tokens}}`.
   """
-  def update_user_password(%Scope{user: user}, attrs) do
-    user |> User.password_changeset(attrs) |> update_user_and_delete_all_tokens()
+  def update_user_password(%Scope{user: user} = scope, attrs) do
+    Repo.transact(fn ->
+      with {:ok, {updated, expired}} <-
+             user |> User.password_changeset(attrs) |> update_user_and_delete_all_tokens() do
+        Audit.record("user.password_changed", scope: scope, subject: updated)
+        {:ok, {updated, expired}}
+      end
+    end)
   end
 
   @doc """
@@ -433,6 +474,9 @@ defmodule StarterKit.Accounts do
 
   @doc "Refreshes sudo with a password or a magic link for this user."
   defdelegate elevate_api_token(scope, session, attrs), to: Sessions
+
+  @doc "Changes the password and atomically rotates this device to a fresh bearer."
+  defdelegate update_api_password(scope, attrs, device), to: Sessions
 
   @doc "Ends impersonation while preserving the original administrator session."
   defdelegate stop_api_impersonation(scope, session), to: Sessions
@@ -520,14 +564,22 @@ defmodule StarterKit.Accounts do
     )
   end
 
+  @doc "Live devices annotated with the caller's session id."
+  def list_sessions(scope, current_id),
+    do: Enum.map(list_sessions(scope), &Map.put(&1, :current, &1.id == current_id))
+
   @doc "Revokes a device owned by this user, including any impersonation sessions it started."
   def revoke_session(%Scope{user: user} = scope, id) do
-    case Repo.get_by(Session, id: id, user_id: user.id) do
-      nil ->
-        {:error, :not_found}
+    session =
+      with {:ok, id} <- Ecto.UUID.cast(id),
+           do: Repo.get_by(Session, id: id, user_id: user.id)
 
-      session ->
+    case session do
+      %Session{} = session ->
         with :ok <- delete_api_token(scope, session), do: {:ok, session}
+
+      _ ->
+        {:error, :not_found}
     end
   end
 
@@ -615,7 +667,14 @@ defmodule StarterKit.Accounts do
         tokens_to_expire =
           Repo.all_by(UserToken, user_id: user.id) ++ list_sessions(Scope.for_user(user))
 
-        Repo.update_all(from(s in Session, where: s.user_id == ^user.id), set: [revoked_at: now()])
+        user_sessions = from s in Session, where: s.user_id == ^user.id, select: s.id
+
+        Repo.update_all(
+          from(s in Session,
+            where: s.user_id == ^user.id or s.impersonator_session_id in subquery(user_sessions)
+          ),
+          set: [revoked_at: now()]
+        )
 
         Repo.delete_all(from(t in UserToken, where: t.user_id == ^user.id))
 

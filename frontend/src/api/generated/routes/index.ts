@@ -29,9 +29,16 @@ import { apiV1InvitationAcceptance } from "./apiV1InvitationAcceptance";
 import { apiV1Locale } from "./apiV1Locale";
 import { apiV1Onboarding } from "./apiV1Onboarding";
 import { apiV1Organization } from "./apiV1Organization";
+import { apiV1SettingsAccount } from "./apiV1SettingsAccount";
+import { apiV1SettingsEmail } from "./apiV1SettingsEmail";
+import { apiV1SettingsEmailConfirmation } from "./apiV1SettingsEmailConfirmation";
+import { apiV1SettingsEmailPreference } from "./apiV1SettingsEmailPreference";
 import { apiV1SettingsInvitation } from "./apiV1SettingsInvitation";
 import { apiV1SettingsMembership } from "./apiV1SettingsMembership";
 import { apiV1SettingsOrganization } from "./apiV1SettingsOrganization";
+import { apiV1SettingsPassword } from "./apiV1SettingsPassword";
+import { apiV1SettingsProfile } from "./apiV1SettingsProfile";
+import { apiV1SettingsSession } from "./apiV1SettingsSession";
 import { dashboard } from "./dashboard";
 import { health } from "./health";
 import { home } from "./home";
@@ -39,17 +46,10 @@ import { legalPage } from "./legalPage";
 import { localizedHome } from "./localizedHome";
 import { localizedLegalPage } from "./localizedLegalPage";
 import { robots } from "./robots";
-import { settingsAccount } from "./settingsAccount";
 import { settingsAppearance } from "./settingsAppearance";
 import { settingsBilling } from "./settingsBilling";
 import { settingsBillingCheckoutSession } from "./settingsBillingCheckoutSession";
 import { settingsBillingPortalSession } from "./settingsBillingPortalSession";
-import { settingsEmail } from "./settingsEmail";
-import { settingsEmailConfirmation } from "./settingsEmailConfirmation";
-import { settingsEmailPreference } from "./settingsEmailPreference";
-import { settingsPassword } from "./settingsPassword";
-import { settingsProfile } from "./settingsProfile";
-import { settingsSession } from "./settingsSession";
 import { sitemap } from "./sitemap";
 import { webDashboard } from "./webDashboard";
 import { webhooksStripeEvent } from "./webhooksStripeEvent";
@@ -84,9 +84,16 @@ export {
   apiV1Locale,
   apiV1Onboarding,
   apiV1Organization,
+  apiV1SettingsAccount,
+  apiV1SettingsEmail,
+  apiV1SettingsEmailConfirmation,
+  apiV1SettingsEmailPreference,
   apiV1SettingsInvitation,
   apiV1SettingsMembership,
   apiV1SettingsOrganization,
+  apiV1SettingsPassword,
+  apiV1SettingsProfile,
+  apiV1SettingsSession,
   dashboard,
   health,
   home,
@@ -94,17 +101,10 @@ export {
   localizedHome,
   localizedLegalPage,
   robots,
-  settingsAccount,
   settingsAppearance,
   settingsBilling,
   settingsBillingCheckoutSession,
   settingsBillingPortalSession,
-  settingsEmail,
-  settingsEmailConfirmation,
-  settingsEmailPreference,
-  settingsPassword,
-  settingsProfile,
-  settingsSession,
   sitemap,
   webDashboard,
   webhooksStripeEvent,
@@ -152,9 +152,16 @@ export const routes = {
   apiV1Locale,
   apiV1Onboarding,
   apiV1Organization,
+  apiV1SettingsAccount,
+  apiV1SettingsEmail,
+  apiV1SettingsEmailConfirmation,
+  apiV1SettingsEmailPreference,
   apiV1SettingsInvitation,
   apiV1SettingsMembership,
   apiV1SettingsOrganization,
+  apiV1SettingsPassword,
+  apiV1SettingsProfile,
+  apiV1SettingsSession,
   dashboard,
   health,
   home,
@@ -162,17 +169,10 @@ export const routes = {
   localizedHome,
   localizedLegalPage,
   robots,
-  settingsAccount,
   settingsAppearance,
   settingsBilling,
   settingsBillingCheckoutSession,
   settingsBillingPortalSession,
-  settingsEmail,
-  settingsEmailConfirmation,
-  settingsEmailPreference,
-  settingsPassword,
-  settingsProfile,
-  settingsSession,
   sitemap,
   webDashboard,
   webhooksStripeEvent,

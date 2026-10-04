@@ -73,4 +73,18 @@ defmodule StarterKitWeb.MailUnavailableTest do
 
     assert_no_email_sent()
   end
+
+  test "email changes refuse before tokens or notifications are written", %{conn: conn} do
+    user = user_fixture(password: "correct horse battery")
+    session = StarterKitWeb.ApiHelpers.sign_in(conn, user)
+    auth = StarterKitWeb.ApiHelpers.bearer(conn, session["token"])
+
+    assert json_response(put(auth, ~p"/api/v1/settings/email", %{email: unique_email()}), 503)[
+             "error"
+           ]["code"] == "email_unavailable"
+
+    assert Repo.reload!(user).email == user.email
+    assert Repo.aggregate(UserToken, :count) == 0
+    assert_no_email_sent()
+  end
 end

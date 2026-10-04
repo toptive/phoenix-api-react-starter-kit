@@ -134,7 +134,7 @@ defmodule StarterKitWeb.PublicTest do
     end
 
     test "form pages keep the session and the CSRF token", %{conn: conn} do
-      conn = conn |> log_in_user(user_fixture()) |> get(~p"/settings/profile/edit")
+      conn = conn |> log_in_user(user_fixture()) |> get(~p"/settings/appearance/edit")
       assert html_response(conn, 200) =~ "csrf-token"
       assert Map.has_key?(conn.resp_cookies, "XSRF-TOKEN")
       assert Map.has_key?(conn.resp_cookies, "_starter_kit_key")

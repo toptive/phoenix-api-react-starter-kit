@@ -59,7 +59,7 @@ defmodule StarterKitWeb.Plugs.PageViewsTest do
   end
 
   test "non-public pages and errors are not tracked", %{conn: conn} do
-    conn |> log_in_user(user_fixture()) |> get("/settings/profile/edit")
+    conn |> log_in_user(user_fixture()) |> get("/settings/appearance/edit")
     get(conn, "/legal/does-not-exist")
     refute_received {:analytics, %{event: "public_page_viewed"}}
   end

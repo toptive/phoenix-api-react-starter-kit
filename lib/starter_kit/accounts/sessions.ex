@@ -185,6 +185,14 @@ defmodule StarterKit.Accounts.Sessions do
     end)
   end
 
+  def update_api_password(scope, attrs, device) do
+    Repo.transact(fn ->
+      with {:ok, {user, _expired}} <- Accounts.update_user_password(scope, attrs) do
+        {:ok, generate_api_token(user, device, organization_id: scope.organization.id)}
+      end
+    end)
+  end
+
   def set_session_organization(session, organization_id) do
     session |> Ecto.Changeset.change(organization_id: organization_id) |> Repo.update()
   end

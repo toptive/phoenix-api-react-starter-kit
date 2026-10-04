@@ -2,18 +2,18 @@
 
 import { buildUrl, type RouteDefinition, type RouteOptions } from "./runtime";
 
-export const settingsSession = {
-  /** DELETE /settings/sessions/:id */
+export const apiV1SettingsSession = {
+  /** DELETE /api/v1/settings/sessions/:id */
   delete: (
     params: { id: string | number } | string | number,
     options?: RouteOptions,
   ): RouteDefinition<"delete"> => ({
-    url: buildUrl("/settings/sessions/:id", params, options),
+    url: buildUrl("/api/v1/settings/sessions/:id", params, options),
     method: "delete",
   }),
-  /** GET /settings/sessions */
+  /** GET /api/v1/settings/sessions */
   index: (options?: RouteOptions): RouteDefinition<"get"> => ({
-    url: buildUrl("/settings/sessions", {}, options),
+    url: buildUrl("/api/v1/settings/sessions", {}, options),
     method: "get",
   }),
 } as const;
