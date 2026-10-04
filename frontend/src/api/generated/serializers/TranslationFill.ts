@@ -2,5 +2,5 @@
 // Source: StarterKitWeb.Serializers.TranslationFillSerializer
 
 export interface TranslationFill {
-  count: number;
+  count: number | null;
 }

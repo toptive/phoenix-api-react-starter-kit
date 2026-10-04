@@ -24,7 +24,7 @@ defmodule StarterKitWeb.Serializers.AdminOrganizationDetailSerializer do
 end
 
 defmodule StarterKitWeb.Serializers.TranslationFillSerializer do
-  @moduledoc "Number of filled translation cells."
+  @moduledoc "Number of filled translation cells, or null while a background fill continues."
   use Typelizer.Serializer
-  attribute :count, type: :integer
+  attribute :count, type: {:nullable, :integer}
 end

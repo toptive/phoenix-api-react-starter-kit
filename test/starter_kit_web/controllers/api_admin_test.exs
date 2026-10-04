@@ -412,10 +412,11 @@ defmodule StarterKitWeb.ApiAdminTest do
     )
   end
 
-  test "translation fill calls AI, edits missing cells, audits and changes public version", %{
-    auth: auth,
-    conn: conn
-  } do
+  test "synchronous translation fill returns 201 with the completed count and updates the catalogue",
+       %{
+         auth: auth,
+         conn: conn
+       } do
     Process.put(:ai_response, fn %{messages: [_, %{content: content}]} ->
       translated =
         content |> Jason.decode!() |> Map.new(fn {key, _} -> {key, "Translated text"} end)
@@ -439,6 +440,16 @@ defmodule StarterKitWeb.ApiAdminTest do
     assert after_fill["data"]["nav.home"] == "Translated text"
     assert Repo.get_by!(Translation, key: "nav.home", locale: "es").edited
     assert [%{metadata: %{"locale" => "es", "count" => 1}}] = events("translation.filled")
+  end
+
+  test "synchronous translation fill returns zero when no cells are missing", %{auth: auth} do
+    Process.put(:ai_response, fn _ -> flunk("AI should not be called for a complete locale") end)
+
+    assert json_response(post(auth, ~p"/api/v1/admin/translation-fills", %{locale: "es"}), 201)[
+             "data"
+           ] == %{"count" => 0}
+
+    assert [%{metadata: %{"locale" => "es", "count" => 0}}] = events("translation.filled")
   end
 
   test "AI provider failure returns 503 without changing translation cells", %{
