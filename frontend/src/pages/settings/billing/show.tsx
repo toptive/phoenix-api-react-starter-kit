@@ -5,6 +5,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { Trans, useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { useBilling, useCheckout, useBillingPortal } from "@/api/hooks/billing"
+import { ApiError } from "@/api/http"
+import ErrorShow from "@/pages/errors/show"
 import type { BillingOverview, Subscription } from "@/api/generated/serializers"
 import { billingSearchSchema } from "@/schemas/search"
 import { checkoutSchema } from "@/schemas/billing"
@@ -38,6 +40,7 @@ export default function BillingShow() {
       toast.success(t("billing.return.confirming"))
     }
   }, [checkout, t])
+  if (query.error instanceof ApiError && query.error.status === 404) return <ErrorShow status={404} />
   if (!query.data) return <QueryState pending={query.isPending} error={query.error} retry={query.refetch} />
   const { plan, subscription, offers, sales, canManage } = query.data
   const paid = subscription?.paid === true

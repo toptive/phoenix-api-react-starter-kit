@@ -31,7 +31,7 @@ export async function uploadFile(file: File, kind: UploadKind): Promise<string> 
   }
   let put: Response
   try {
-    put = await fetch(upload.url, { method: "PUT", headers: upload.headers, body: file })
+    put = await fetch(upload.url, { method: upload.method, headers: upload.headers, body: file })
   } catch {
     toast.error(i18n.t("errors.network"), { id: "network-status" })
     throw new UploadError("network", i18n.t("errors.network"))

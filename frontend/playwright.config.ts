@@ -16,12 +16,26 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: process.env.E2E_BASE_URL
     ? undefined
-    : {
-        command: "pnpm dev --host localhost --port 5173 --strictPort",
-        cwd: "..",
-        url: baseURL,
-        reuseExistingServer: false,
-        env: { VITE_API_URL: "", VITE_DEV_API_URL: process.env.E2E_API_URL ?? "http://localhost:4100" },
-        timeout: 60_000,
-      },
+    : [
+        {
+          command: "pnpm dev --host localhost --port 5173 --strictPort",
+          cwd: "..",
+          url: baseURL,
+          reuseExistingServer: false,
+          env: { VITE_API_URL: "", VITE_DEV_API_URL: process.env.E2E_API_URL ?? "http://localhost:4100" },
+          timeout: 60_000,
+        },
+        ...(process.env.E2E_BILLING === "1"
+          ? [
+              {
+                command: "pnpm dev --host localhost --port 5174 --strictPort",
+                cwd: "..",
+                url: process.env.E2E_BASE_OFF_URL ?? "http://localhost:5174",
+                reuseExistingServer: false,
+                env: { VITE_API_URL: "", VITE_DEV_API_URL: process.env.E2E_API_OFF_URL ?? "http://localhost:4101" },
+                timeout: 60_000,
+              },
+            ]
+          : []),
+      ],
 })

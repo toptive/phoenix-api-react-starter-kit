@@ -137,8 +137,40 @@ respects real rate limits. Its final throttling journey asserts a browser 429 an
 
 Admin journeys run by default. Without AI configuration, Fill must show `ai_not_configured`
 in place; `E2E_AI=1` switches only the Fill assertion to success when the backend provides a
-test adapter. Only billing journeys remain skipped until `E2E_BILLING=1` supplies the billing
-API, Stripe test HTTP adapter and subscription fixtures.
+test adapter. The two billing-on journeys skip by default; they require Phoenix's
+`STRIPE_API_BASE` billing URL guard override for local stub URLs. The billing-off 404 journey always runs.
+Run the complete suite with `E2E_BILLING=1`: global setup starts the local
+Stripe stub and a second Phoenix process with billing off, and tears both down after the run.
+The main API must run with billing on, real Oban queues, and these local fixture settings:
+
+```sh
+BILLING_ENABLED=true BILLING_MODE=test \
+STRIPE_TEST_SECRET_KEY=sk_test_e2e_local_fixture \
+STRIPE_TEST_WEBHOOK_SECRET=whsec_e2e_local_fixture \
+STRIPE_TEST_PRICE_PRO_MONTHLY=price_e2e_monthly \
+STRIPE_TEST_PRICE_PRO_YEARLY=price_e2e_yearly
+```
+
+Apply the Stripe transport override before starting the application in the isolated snapshot:
+
+```elixir
+billing = Application.get_env(:starter_kit, StarterKit.Billing)
+Application.put_env(:starter_kit, StarterKit.Billing,
+  Keyword.put(billing, :req_options, [base_url: "http://127.0.0.1:4242/v1/"]))
+```
+
+These dummy keys belong only to the stub. It serves configured prices, checkout and portal
+sessions, and subscriptions fetched by reconciliation. The checkout journey posts
+`{ organizationId }` to `POST /__stub/webhook` after observing an unpaid poll; the stub signs
+and delivers both completion events to the real API. The API must accept the stub's local
+SPA return URL in this isolated lane. Browser API requests always use the real backend.
+
+Defaults: main API `4100`, flag-off API `4101`, main SPA `5173`, flag-off SPA `5174`, Stripe
+`4242`. Override with `E2E_API_URL`, `E2E_API_OFF_URL`, `E2E_BASE_URL`, `E2E_BASE_OFF_URL`,
+and `E2E_STRIPE_URL`; when supplying an external SPA origin, start both SPA servers yourself.
+`E2E_STRIPE_OFFERS` accepts the server's offer fixtures as JSON with `id`, `priceId`,
+`amountCents`, `currency`, and `interval`. Set the same webhook secret and price ids on the
+API and runner. Rails/Rust implement `startBillingOffApi()` in the per-kit seam.
 
 `pnpm lint` includes the catalogue audit. To prune unused frontend keys while preserving
 backend keys and dynamic/plural families, run `node i18n/scripts/audit.mjs --prune`, review

@@ -1,5 +1,6 @@
 /** Per-kit fixture seam. Rails/Rust implement these exports against their isolated test backend. */
-import { execFileSync } from "node:child_process"
+import { execFileSync, spawn } from "node:child_process"
+import { setTimeout as delay } from "node:timers/promises"
 
 function database() {
   const name = process.env.E2E_PGDATABASE ?? "starter_kit_e2e"
@@ -32,7 +33,7 @@ function run(code: string) {
       cwd: process.env.E2E_API_DIR ?? new URL("../../../../phoenix-api-react-starter-kit", import.meta.url).pathname,
       env: {
         ...process.env,
-        MIX_ENV: "dev",
+        MIX_ENV: process.env.MIX_ENV ?? "dev",
         PGDATABASE: database(),
         ERL_FLAGS: "+S 2:2",
         SPA_ORIGIN: process.env.E2E_BASE_URL ?? "http://localhost:5173",
@@ -96,4 +97,71 @@ export function sendOptionalEmail(userId: string) {
     user = StarterKit.Accounts.get_user!("${uuid(userId)}")
     {:ok, _} = StarterKit.Notifications.notify(user, :product_update, %{title: "Browser news", summary: "Test newsletter", url: "http://localhost:5173/"})
   `)
+}
+
+/** Run the flag-off lane against the same isolated database, without changing the main API. */
+export async function startBillingOffApi() {
+  const url = new URL(process.env.E2E_API_OFF_URL ?? "http://localhost:4101")
+  const port = Number(url.port)
+  if (!Number.isInteger(port) || port < 1) throw new Error("E2E_API_OFF_URL requires a port")
+  const child = spawn(
+    "mix",
+    [
+      "run",
+      "--no-start",
+      "--no-compile",
+      "--no-halt",
+      "-e",
+      `
+    repo = Application.get_env(:starter_kit, StarterKit.Repo)
+    Application.put_env(:starter_kit, StarterKit.Repo,
+      Keyword.put(repo, :port, String.to_integer(System.get_env("PGPORT", "5432"))))
+    flags = Application.get_env(:starter_kit, StarterKit.Flags)
+    Application.put_env(:starter_kit, StarterKit.Flags, Keyword.put(flags, :billing, false))
+    endpoint = Application.get_env(:starter_kit, StarterKitWeb.Endpoint)
+    Application.put_env(:starter_kit, StarterKitWeb.Endpoint,
+      Keyword.merge(endpoint, server: true, watchers: [], reloadable_apps: [], http: [ip: {127, 0, 0, 1}, port: ${port}]))
+    oban = Application.get_env(:starter_kit, Oban)
+    Application.put_env(:starter_kit, Oban, Keyword.merge(oban, queues: false, plugins: false))
+    {:ok, _} = Application.ensure_all_started(:starter_kit)
+  `,
+    ],
+    {
+      cwd: process.env.E2E_API_DIR ?? new URL("../../../../phoenix-api-react-starter-kit", import.meta.url).pathname,
+      env: { ...process.env, MIX_ENV: process.env.MIX_ENV ?? "dev", PGDATABASE: database(), ERL_FLAGS: "+S 2:2" },
+      stdio: "ignore",
+    },
+  )
+  let spawnError: Error | undefined
+  child.on("error", (error) => {
+    spawnError = error
+  })
+  const stop = async () => {
+    if (child.exitCode !== null || child.signalCode !== null || spawnError) return
+    const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))
+    child.kill("SIGTERM")
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL")
+    }, 5_000)
+    await exited
+    clearTimeout(timer)
+  }
+  try {
+    const deadline = Date.now() + 60_000
+    while (Date.now() < deadline) {
+      if (spawnError) throw spawnError
+      if (child.exitCode !== null) throw new Error(`Flag-off API exited: ${child.exitCode}`)
+      try {
+        const response = await fetch(new URL("/health", url), { signal: AbortSignal.timeout(1_000) })
+        if (response.ok) return stop
+      } catch {
+        /* Wait for the isolated API to bind its port. */
+      }
+      await delay(250)
+    }
+    throw new Error("Flag-off API did not become healthy")
+  } catch (error) {
+    await stop()
+    throw error
+  }
 }
