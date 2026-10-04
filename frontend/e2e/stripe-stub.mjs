@@ -3,21 +3,21 @@ import { createServer } from "node:http"
 
 // These are local fixtures, never credentials for a Stripe account.
 export const stripeStubConfig = {
-  url: process.env.E2E_STRIPE_URL ?? "http://127.0.0.1:4242",
-  secret: process.env.STRIPE_TEST_WEBHOOK_SECRET ?? "whsec_e2e_local_fixture",
+  url: process.env.E2E_STRIPE_URL ?? "http://localhost:4200",
+  secret: process.env.STRIPE_TEST_WEBHOOK_SECRET ?? "whsec_test_fake",
   offers: JSON.parse(
     process.env.E2E_STRIPE_OFFERS ??
       JSON.stringify([
         {
           id: "pro_monthly",
-          priceId: process.env.STRIPE_TEST_PRICE_PRO_MONTHLY ?? "price_e2e_monthly",
+          priceId: process.env.STRIPE_TEST_PRICE_PRO_MONTHLY ?? "price_test_monthly",
           amountCents: 1900,
           currency: "usd",
           interval: "month",
         },
         {
           id: "pro_yearly",
-          priceId: process.env.STRIPE_TEST_PRICE_PRO_YEARLY ?? "price_e2e_yearly",
+          priceId: process.env.STRIPE_TEST_PRICE_PRO_YEARLY ?? "price_test_yearly",
           amountCents: 19000,
           currency: "usd",
           interval: "year",
@@ -54,6 +54,11 @@ export async function startStripeStub() {
       const raw = Buffer.concat(chunks).toString()
       if (request.method === "GET" && path === "/__stub/health") return send(200, { ready: true })
       if (request.method === "GET" && path === "/__stub/calls") return send(200, { calls })
+      if (request.method === "GET" && (path.startsWith("/checkout/") || path.startsWith("/portal/"))) {
+        const returnPath = path.startsWith("/checkout/") ? "/settings/billing?checkout=done" : "/settings/billing"
+        response.writeHead(302, { location: new URL(returnPath, spaURL).href })
+        return response.end()
+      }
       const form = new URLSearchParams(raw)
       if (path.startsWith("/v1/")) calls.push({ method: request.method, path, form: Object.fromEntries(form) })
       if (request.method === "GET" && path.startsWith("/v1/prices/")) {
@@ -84,7 +89,7 @@ export async function startStripeStub() {
           subscription: subscriptionId,
           metadata: subscription.metadata,
         })
-        return send(200, { id, url: new URL("/settings/billing?checkout=done", spaURL).href })
+        return send(200, { id, url: new URL(`/checkout/${id}`, stripeStubConfig.url).href })
       }
       if (request.method === "GET" && path.startsWith("/v1/subscriptions/")) {
         const subscription = subscriptions.get(path.split("/").at(-1))
@@ -93,7 +98,8 @@ export async function startStripeStub() {
       if (request.method === "POST" && path === "/v1/billing_portal/sessions") {
         if (![...subscriptions.values()].some((subscription) => subscription.customer === form.get("customer")))
           return send(400, { error: { code: "unknown_customer" } })
-        return send(200, { id: `bps_${randomUUID()}`, url: new URL("/settings/billing?checkout=done", spaURL).href })
+        const id = `bps_${randomUUID()}`
+        return send(200, { id, url: new URL(`/portal/${id}`, stripeStubConfig.url).href })
       }
       if (request.method === "POST" && path === "/__stub/webhook") {
         const { organizationId } = JSON.parse(raw)
@@ -131,7 +137,8 @@ export async function startStripeStub() {
   const url = new URL(stripeStubConfig.url)
   await new Promise((resolve, reject) => {
     server.once("error", reject)
-    server.listen(Number(url.port), url.hostname, resolve)
+    // Bind localhost to IPv4 so Phoenix and the browser reach the same stub.
+    server.listen(Number(url.port), url.hostname === "localhost" ? "127.0.0.1" : url.hostname, resolve)
   })
   return async () => {
     server.closeAllConnections()

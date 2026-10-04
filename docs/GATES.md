@@ -85,19 +85,14 @@ Postgres allows 100 connections. Keep `POOL_SIZE` small (2–5) when several lan
 
 `pnpm e2e` runs Chromium journeys against a real API; `pnpm e2e:ui` opens the runner.
 Install Chromium once with `pnpm exec playwright install chromium`. Playwright owns Vite on
-5173, proxied to `E2E_API_URL` (default `http://localhost:4100`); `E2E_BASE_URL` uses an existing
-SPA. Reports and traces live in ignored `frontend/playwright-report/` and `frontend/test-results/`.
+`E2E_BASE_URL` (default `http://localhost:5173`), proxied to `E2E_API_URL`
+(default `http://localhost:4100`). Vite listen ports come from the SPA URLs. Reports and traces
+live in ignored `frontend/playwright-report/` and `frontend/test-results/`.
 No browser API mocks; external Stripe/AI adapters belong to the backend.
 
-Phoenix development fallback (run from the API checkout):
-
-```sh
-PGDATABASE=starter_kit_e2e mix ecto.create
-PGDATABASE=starter_kit_e2e mix ecto.migrate
-OPENROUTER_API_KEY='' PGDATABASE=starter_kit_e2e PORT=4100 VITE_PORT=5199 SPA_ORIGIN=http://localhost:5173 mix phx.server
-```
-
-Then run `E2E_PGDATABASE=starter_kit_e2e pnpm e2e` from the SPA root. The dev mailer uses
+Run the Phoenix kit's `bin/e2e` from its checkout for API setup, browser execution, and cleanup.
+For a separately managed API, run `pnpm e2e` from the SPA root with the same `E2E_API_DIR`,
+`MIX_BUILD_PATH`, and `E2E_PGDATABASE` as the API. The dev mailer uses
 Swoosh Local. Global setup clears `/dev/mailbox/clear` using its CSRF form (or verifies the
 mailbox is already empty), then fixtures poll `/dev/mailbox/json` filtered by recipient and
 link prefix. Override `E2E_MAILBOX_PATH` / `E2E_MAILBOX_CLEAR_PATH` for another kit.
@@ -106,8 +101,8 @@ Swoosh has no server-side recipient filter; keeping the mailbox bounded avoids l
 `frontend/e2e/backend.ts` is the only per-kit seam. Each backend implements the same interface:
 `seedUser(email, admin?)` returns a confirmed account's fresh `{ token, expiresAt, sudoUntil }`;
 `expireSudo(sessionId)` expires only that session; `sendOptionalEmail(userId)` queues real
-optional mail. Phoenix uses `mix run --no-start --no-compile` with queues disabled and an isolated database:
-its seed pattern inserts a confirmed user and calls `Accounts.generate_api_token/1`; its first
+optional mail. Phoenix uses `mix run --no-start --no-compile` with `MIX_ENV=test`, `E2E=1`,
+queues disabled, and an isolated database. Its seed pattern inserts a confirmed user and calls `Accounts.generate_api_token/1`; its first
 superadmin uses `Accounts.bootstrap_superadmin/1` (the hook behind
 `mix starter_kit.admin.bootstrap EMAIL`). Registration remains a real browser journey.
 Password setup, onboarding and subsequent business actions go through the API. Set
@@ -137,40 +132,24 @@ respects real rate limits. Its final throttling journey asserts a browser 429 an
 
 Admin journeys run by default. Without AI configuration, Fill must show `ai_not_configured`
 in place; `E2E_AI=1` switches only the Fill assertion to success when the backend provides a
-test adapter. The two billing-on journeys skip by default; they require Phoenix's
-`STRIPE_API_BASE` billing URL guard override for local stub URLs. The billing-off 404 journey always runs.
-Run the complete suite with `E2E_BILLING=1`: global setup starts the local
-Stripe stub and a second Phoenix process with billing off, and tears both down after the run.
-The main API must run with billing on, real Oban queues, and these local fixture settings:
+test adapter.
 
-```sh
-BILLING_ENABLED=true BILLING_MODE=test \
-STRIPE_TEST_SECRET_KEY=sk_test_e2e_local_fixture \
-STRIPE_TEST_WEBHOOK_SECRET=whsec_e2e_local_fixture \
-STRIPE_TEST_PRICE_PRO_MONTHLY=price_e2e_monthly \
-STRIPE_TEST_PRICE_PRO_YEARLY=price_e2e_yearly
-```
+The Phoenix API kit's `bin/e2e` owns the test environment, build path, database lifecycle,
+and `STRIPE_API_BASE` override. `E2E_BILLING=1` starts the
+Stripe stub and billing-off API in global setup; teardown stops both. Browser API requests
+use the real backend.
 
-Apply the Stripe transport override before starting the application in the isolated snapshot:
+Defaults: main API `4100`, billing-off API `4101`, main SPA `5173`, billing-off SPA `5174`,
+Stripe stub `localhost:4200`. Override with `E2E_API_URL`, `E2E_API_OFF_URL`, `E2E_BASE_URL`,
+`E2E_BASE_OFF_URL`, and `E2E_STRIPE_URL`. The kit's `bin/e2e` sets `E2E_VITE_PORT` and
+`E2E_BASE_OFF_URL` for its own SPA ports. Playwright starts Vite on each SPA URL's port.
 
-```elixir
-billing = Application.get_env(:starter_kit, StarterKit.Billing)
-Application.put_env(:starter_kit, StarterKit.Billing,
-  Keyword.put(billing, :req_options, [base_url: "http://127.0.0.1:4242/v1/"]))
-```
-
-These dummy keys belong only to the stub. It serves configured prices, checkout and portal
-sessions, and subscriptions fetched by reconciliation. The checkout journey posts
-`{ organizationId }` to `POST /__stub/webhook` after observing an unpaid poll; the stub signs
-and delivers both completion events to the real API. The API must accept the stub's local
-SPA return URL in this isolated lane. Browser API requests always use the real backend.
-
-Defaults: main API `4100`, flag-off API `4101`, main SPA `5173`, flag-off SPA `5174`, Stripe
-`4242`. Override with `E2E_API_URL`, `E2E_API_OFF_URL`, `E2E_BASE_URL`, `E2E_BASE_OFF_URL`,
-and `E2E_STRIPE_URL`; when supplying an external SPA origin, start both SPA servers yourself.
-`E2E_STRIPE_OFFERS` accepts the server's offer fixtures as JSON with `id`, `priceId`,
-`amountCents`, `currency`, and `interval`. Set the same webhook secret and price ids on the
-API and runner. Rails/Rust implement `startBillingOffApi()` in the per-kit seam.
+The API and runner share `STRIPE_TEST_WEBHOOK_SECRET`, `STRIPE_TEST_PRICE_PRO_MONTHLY`, and
+`STRIPE_TEST_PRICE_PRO_YEARLY`; defaults match the kit's `config/test.exs`. `E2E_STRIPE_OFFERS`
+accepts offer fixtures as JSON with `id`, `priceId`, `amountCents`, `currency`, and `interval`.
+`E2E_API_DIR`, `MIX_BUILD_PATH`, `E2E_PGDATABASE`, and `PORT` select the kit root, compiled test
+build, isolated database, and API port. Rails/Rust implement `startBillingOffApi()` in the
+per-kit seam.
 
 `pnpm lint` includes the catalogue audit. To prune unused frontend keys while preserving
 backend keys and dynamic/plural families, run `node i18n/scripts/audit.mjs --prune`, review

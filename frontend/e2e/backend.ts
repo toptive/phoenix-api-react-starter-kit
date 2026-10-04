@@ -1,11 +1,29 @@
 /** Per-kit fixture seam. Rails/Rust implement these exports against their isolated test backend. */
 import { execFileSync, spawn } from "node:child_process"
+import { join } from "node:path"
 import { setTimeout as delay } from "node:timers/promises"
 
 function database() {
   const name = process.env.E2E_PGDATABASE ?? "starter_kit_e2e"
   if (!/(?:e2e|test)/.test(name)) throw new Error("Fixtures require an isolated e2e/test database")
   return name
+}
+function backendOptions(apiURL = process.env.E2E_API_URL ?? "http://localhost:4100") {
+  const cwd = process.env.E2E_API_DIR ?? new URL("../../../../phoenix-api-react-starter-kit", import.meta.url).pathname
+  return {
+    cwd,
+    env: {
+      ...process.env,
+      MIX_ENV: "test",
+      E2E: "1",
+      MIX_BUILD_PATH: process.env.MIX_BUILD_PATH ?? join(cwd, "_build/e2e"),
+      E2E_PGDATABASE: database(),
+      PORT: new URL(apiURL).port,
+      PGDATABASE: database(),
+      ERL_FLAGS: process.env.ERL_FLAGS ?? "+S 2:2",
+      SPA_ORIGIN: process.env.E2E_BASE_URL ?? "http://localhost:5173",
+    },
+  }
 }
 function run(code: string) {
   const result = execFileSync(
@@ -30,14 +48,7 @@ function run(code: string) {
   `,
     ],
     {
-      cwd: process.env.E2E_API_DIR ?? new URL("../../../../phoenix-api-react-starter-kit", import.meta.url).pathname,
-      env: {
-        ...process.env,
-        MIX_ENV: process.env.MIX_ENV ?? "dev",
-        PGDATABASE: database(),
-        ERL_FLAGS: "+S 2:2",
-        SPA_ORIGIN: process.env.E2E_BASE_URL ?? "http://localhost:5173",
-      },
+      ...backendOptions(),
       encoding: "utf8",
       timeout: 30_000,
     },
@@ -127,8 +138,7 @@ export async function startBillingOffApi() {
   `,
     ],
     {
-      cwd: process.env.E2E_API_DIR ?? new URL("../../../../phoenix-api-react-starter-kit", import.meta.url).pathname,
-      env: { ...process.env, MIX_ENV: process.env.MIX_ENV ?? "dev", PGDATABASE: database(), ERL_FLAGS: "+S 2:2" },
+      ...backendOptions(url.href),
       stdio: "ignore",
     },
   )

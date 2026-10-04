@@ -25,7 +25,10 @@ test("billing off hides navigation and a direct visit shows the 404 page", async
 })
 
 test.describe("billing enabled", () => {
-  test.skip(!billingEnabled, "Requires E2E_BILLING=1 and Phoenix's STRIPE_API_BASE billing URL guard override for local stub URLs.")
+  test.skip(
+    !billingEnabled,
+    "Requires E2E_BILLING=1 and Phoenix's STRIPE_API_BASE billing URL guard override for local stub URLs.",
+  )
   test("test offers require acceptance; checkout polls until signed webhooks activate the plan, then opens the portal", async ({
     page,
     api,
@@ -33,6 +36,7 @@ test.describe("billing enabled", () => {
     createUser,
   }) => {
     const user = await createUser()
+    // Test-mode checkout allows operators only, so promote this organization manager to superadmin.
     await api.call(routes.apiV1AdminUsers.update(user.user.id), { role: "superadmin" }, admin.token)
     const organizationId = (await api.bootstrap(user.token)).auth!.organization.id
     const overview = await api.call<BillingOverview>(routes.apiV1SettingsBilling.show(), undefined, user.token)
@@ -76,21 +80,31 @@ test.describe("billing enabled", () => {
       (response) =>
         response.request().method() === "POST" && response.url().endsWith("/api/v1/settings/billing/checkout-session"),
     )
+    const firstReturnLoad = page.waitForResponse(
+      (response) =>
+        response.request().method() === "GET" &&
+        response.url().endsWith("/api/v1/settings/billing") &&
+        new URL(page.url()).searchParams.get("checkout") === "done" &&
+        response.ok(),
+    )
     await pay.click()
     const checkedOut = await checkoutResponse
     expect(checkedOut.status(), await checkedOut.text()).toBe(201)
-    expect((await checkedOut.json()).data.url).toBe(
-      new URL("/settings/billing?checkout=done", process.env.E2E_BASE_URL ?? "http://localhost:5173").href,
-    )
-    await expect(page).toHaveURL(/\/settings\/billing\?checkout=done$/)
+    const checkoutURL = new URL((await checkedOut.json()).data.url)
+    expect(checkoutURL.origin).toBe(new URL(stripeStubConfig.url).origin)
+    expect(checkoutURL.pathname).toMatch(/^\/checkout\/cs_test_[0-9a-f-]+$/)
+    await expect(page).toHaveURL(/checkout=done/)
+    await firstReturnLoad
     await expect(page.getByText(text("billing.return.confirming"), { exact: true }).first()).toBeVisible()
     await expect(page.getByRole("button", { name: text("billing.return.check_again"), exact: true })).toBeVisible()
     // Observe an unpaid refetch after the initial return request, then send real signed webhooks.
-    const unpaidPoll = await page.waitForResponse(
-      (response) => response.url().endsWith("/api/v1/settings/billing") && response.ok(),
+    const pollRequest = await page.waitForRequest(
+      (request) => request.method() === "GET" && request.url().endsWith("/api/v1/settings/billing"),
       { timeout: 10_000 },
     )
-    expect((await unpaidPoll.json()).data.subscription?.paid).not.toBe(true)
+    const unpaidPoll = await pollRequest.response()
+    expect(unpaidPoll?.ok()).toBe(true)
+    expect((await unpaidPoll!.json()).data.subscription?.paid).not.toBe(true)
     const delivered = await api.context.post(new URL("/__stub/webhook", stripeStubConfig.url).href, {
       data: { organizationId },
     })
@@ -112,11 +126,13 @@ test.describe("billing enabled", () => {
     await page.getByRole("button", { name: text("billing.portal.open"), exact: true }).click()
     const portal = await portalResponse
     expect(portal.status(), await portal.text()).toBe(201)
-    expect((await portal.json()).data.url).toBe(
-      new URL("/settings/billing?checkout=done", process.env.E2E_BASE_URL ?? "http://localhost:5173").href,
-    )
-    await expect(page).toHaveURL(/\/settings\/billing\?checkout=done$/)
+    const portalURL = new URL((await portal.json()).data.url)
+    expect(portalURL.origin).toBe(new URL(stripeStubConfig.url).origin)
+    expect(portalURL.pathname).toMatch(/^\/portal\/bps_[0-9a-f-]+$/)
+    await expect(page).toHaveURL(/\/settings\/billing$/)
     await expect(page.getByText(text("billing.plan.pro"), { exact: true })).toBeVisible()
+    await expect(page.getByText(text("billing.return.active"), { exact: true })).toHaveCount(0)
+    await expect(page.getByRole("button", { name: text("billing.return.check_again"), exact: true })).toHaveCount(0)
     const calls = await api.context.get(new URL("/__stub/calls", stripeStubConfig.url).href)
     const recorded = (await calls.json()).calls as { method: string; path: string; form: Record<string, string> }[]
     const checkout = recorded.find((call) => call.path === "/v1/checkout/sessions")!
