@@ -25,7 +25,7 @@ test("billing off hides navigation and a direct visit shows the 404 page", async
 })
 
 test.describe("billing enabled", () => {
-  test.skip(!billingEnabled, "Requires the local Stripe stub; run bin/e2e to enable billing journeys.")
+  test.skip(!billingEnabled, "Requires E2E_BILLING=1 and the local Stripe stub; run bin/e2e to enable billing journeys.")
   test("test offers require acceptance; checkout polls until signed webhooks activate the plan, then opens the portal", async ({
     page,
     api,

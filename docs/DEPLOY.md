@@ -18,7 +18,8 @@ The image needs typelizer on Hex **or vendored inside the build context**. A sib
 `path: "../typelizer-ex"` dependency cannot build from a clean clone. The kit currently uses
 `vendor/typelizer` (source revision in [TYPE_CONTRACT.md](TYPE_CONTRACT.md)); the Dockerfile
 copies it before fetching dependencies and rejects the old sibling path with a clear error.
-Replace it with Hex only after the route naming options are published.
+Replace it with Hex only after the route naming options are published, following the
+[Hex migration checklist](TYPE_CONTRACT.md#switching-typelizer-to-hex).
 
 For a local image smoke test, use a disposable database and fixture values:
 

@@ -47,7 +47,18 @@ The generator excludes the SPA fallback, `/dev`, `/live` and `/admin/jobs` brows
 | `apiV1AuthGoogleCallback.create` | Google OAuth redirect, never called by SPA code |
 | `webhooksStripeEvents.create` | Stripe webhook delivery |
 
+## Switching typelizer to Hex
+
 Typelizer is vendored at `vendor/typelizer` from the `route-naming-controller-path` branch,
 commit `38c0918`. This snapshot makes builds and new products independent of sibling checkouts.
-Swap to the Hex dependency once controller-path naming and `group_overrides` are released;
-generator changes belong in the library. Keep its MIT license with the snapshot.
+Generator changes belong in the library. Keep its MIT license with the snapshot.
+
+Once controller-path naming and `group_overrides` are released on Hex, make these changes together:
+
+1. Replace the path dependency in `mix.exs` with `{:typelizer, "~> 0.3"}`, run `mix deps.get`
+   and commit the updated `mix.lock`.
+2. Delete `vendor/typelizer/`.
+3. Remove `COPY vendor/typelizer vendor/typelizer` and the complete sibling-path guard
+   (`RUN if ... fi`) from `Dockerfile`.
+4. Remove the `vendor/` exclusion from `bin/rename`.
+5. Run `mix typelizer.gen`, review any generated changes, and run `bin/check` before committing.
