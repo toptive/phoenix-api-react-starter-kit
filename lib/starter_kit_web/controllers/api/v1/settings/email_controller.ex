@@ -7,6 +7,12 @@ defmodule StarterKitWeb.Api.V1.Settings.EmailController do
 
   plug :require_sudo
 
+  plug StarterKitWeb.Plugs.RateLimit,
+    bucket: "email_change",
+    limit: 5,
+    period: :timer.minutes(1),
+    by: :user
+
   def update(conn, params) do
     conn = authorize!(conn, :update, scope(conn).user)
 

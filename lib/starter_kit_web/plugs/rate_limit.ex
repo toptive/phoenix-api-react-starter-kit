@@ -21,7 +21,12 @@ defmodule StarterKitWeb.Plugs.RateLimit do
 
   @impl true
   def call(conn, %{bucket: bucket, limit: limit, period: period} = opts) do
-    key = "#{bucket}:#{conn.remote_ip |> :inet.ntoa() |> to_string()}"
+    identity =
+      if opts[:by] == :user,
+        do: conn.assigns.current_user.id,
+        else: conn.remote_ip |> :inet.ntoa() |> to_string()
+
+    key = "#{bucket}:#{identity}"
 
     case RateLimit.hit(key, period, limit) do
       {:allow, _count} ->

@@ -566,7 +566,7 @@ defmodule StarterKit.Accounts do
 
   @doc "Live devices annotated with the caller's session id."
   def list_sessions(scope, current_id),
-    do: Enum.map(list_sessions(scope), &Map.put(&1, :current, &1.id == current_id))
+    do: Enum.map(list_sessions(scope), &%{session: &1, current: &1.id == current_id})
 
   @doc "Revokes a device owned by this user, including any impersonation sessions it started."
   def revoke_session(%Scope{user: user} = scope, id) do

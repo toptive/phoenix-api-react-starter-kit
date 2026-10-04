@@ -85,7 +85,7 @@ Every successful sudo refresh records `user.sudo_authenticated`, including passw
 sign-in that refreshes the same bearer.
 
 Impersonation uses a separate session with no sudo window and an eight-hour expiry that never
-slides. Sudo returns 403 `forbidden`.
+slides.
 `DELETE /auth/impersonation` revokes it, ends its impersonation record and audits the stop; the SPA
 restores the admin token it saved. A normal session gets 409 `conflict` when trying to stop
 impersonation. Signing out while impersonating revokes both sessions. Revoking an administrator
@@ -125,6 +125,8 @@ ionic://localhost and http://localhost, with no credentials and no PATCH.
 | Email opt-out | 120/min |
 | Email confirmation | 10/min |
 | Account deletion | 5/min |
+
+Email change requests are limited to 5/min per user, shared across their devices and IPs.
 
 Over-limit responses are 429 `rate_limited`, with both `Retry-After` and `details.retryAfter`.
 All errors are private, no-store and noindex. Turnstile is off by default. When enabled, registration

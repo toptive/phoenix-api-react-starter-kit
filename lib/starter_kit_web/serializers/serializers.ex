@@ -32,8 +32,17 @@ defmodule StarterKitWeb.Serializers.SessionSerializer do
   @moduledoc "A signed-in device (a session token row, without the token)."
   use Typelizer.Serializer, schema: StarterKit.Accounts.Session
 
-  attributes [:id, :user_agent, :ip_address, :authenticated_at, :inserted_at]
-  attribute :current, type: :boolean, value: &Map.get(&1, :current, false)
+  attribute :id, type: :string, value: & &1.session.id
+  attribute :user_agent, type: {:nullable, :string}, value: & &1.session.user_agent
+  attribute :ip_address, type: {:nullable, :string}, value: & &1.session.ip_address
+
+  attribute :authenticated_at,
+    type: {:nullable, :utc_datetime},
+    value: & &1.session.authenticated_at
+
+  attribute :inserted_at, type: :utc_datetime, value: & &1.session.inserted_at
+
+  attribute :current, type: :boolean, value: & &1.current
 end
 
 defmodule StarterKitWeb.Serializers.PaginationSerializer do

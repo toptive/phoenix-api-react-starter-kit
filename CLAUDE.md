@@ -37,18 +37,18 @@ One Mix project and one `package.json` at the root. Frontend commands run from t
 ## Layout
 
 ```
-lib/starter_kit/            domain — one boundary per context (accounts, organizations, i18n, legal, audit, billing, privacy)
-lib/starter_kit/<ctx>/      schemas, policies (exported), helper modules and workers (private)
-lib/starter_kit/*.ex        platform modules: analytics, notifications, mailer, ai, uploads, monitoring
-lib/starter_kit_web/        router, REST controllers, serializers, plugs, SEO, Vite tags
-frontend/src/pages/            one React page per controller action (kebab-case paths)
+lib/starter_kit/               domain — accounts, organizations, i18n, legal, audit, billing, privacy
+lib/starter_kit/<ctx>/         schemas, policies (exported), helper modules and workers (private)
+lib/starter_kit/*.ex           platform modules: analytics, notifications, mailer, ai, uploads, monitoring
+lib/starter_kit_web/           router, REST controllers, serializers, plugs, SEO, SPA delivery
+frontend/src/pages/            SPA pages organized by resource (kebab-case paths)
 frontend/src/components/ui/    shadcn primitives — OWNED, edit them freely
 frontend/src/components/app/   shared app components (FormStepper, FieldHelp, ConfirmDialog, …)
 frontend/src/layouts/          public, auth, app (sidebar), settings, admin
-frontend/src/api/generated/        typelizer output — never edit
-assets/css/theme.css        the only file a product edits to re-skin
-i18n/                       translations.csv → locales/*.json, scripts
-credo/, test/architecture/  our rules, executable
+frontend/src/api/generated/    typelizer output — never edit
+frontend/src/styles/theme.css  the only file a product edits to re-skin
+i18n/                         translations.csv → locales/*.json, scripts
+credo/, test/architecture/     our rules, executable
 ```
 
 ## Backend
@@ -106,7 +106,7 @@ hard-code a path. The pages generator is disabled. Details: [docs/TYPE_CONTRACT.
   app-wide by editing the component. Repeated patterns become `components/app/*`
   (never copy-paste between pages).
 - **Theme tokens only**: `bg-primary`, `text-muted-foreground`… Never `text-blue-500` or `#hex`
-  (ESLint fails). New colours are new tokens in `assets/css/theme.css`.
+  (ESLint fails). New colours are new tokens in `frontend/src/styles/theme.css`.
 - All files and folders kebab-case. Pages mirror controllers: `pages/<resource>/<action>.tsx`.
 
 ## UX rules

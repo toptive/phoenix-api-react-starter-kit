@@ -659,6 +659,27 @@ defmodule StarterKitWeb.ApiSettingsTest do
     assert_error(get(bearer(conn, other.token), ~p"/api/v1/settings/sessions"), 401, "unauthorized")
   end
 
+  test "email changes are limited per user across devices and IPs", %{
+    conn: conn,
+    auth: auth,
+    user: user
+  } do
+    for _ <- 1..5,
+        do: assert_error(put(auth, ~p"/api/v1/settings/email", %{}), 422, "validation_failed")
+
+    other_device = bearer(api_conn(conn), Accounts.generate_api_token(user).token)
+    result = put(other_device, ~p"/api/v1/settings/email", %{})
+    assert_error(result, 429, "rate_limited")
+    assert get_resp_header(result, "retry-after") != []
+    other_user = user_fixture(password: "correct horse battery")
+
+    assert_error(
+      put(bearer(conn, sign_in(conn, other_user)["token"]), ~p"/api/v1/settings/email", %{}),
+      422,
+      "validation_failed"
+    )
+  end
+
   test "email confirmations are rate limited", %{auth: auth} do
     for _ <- 1..10, do: post(auth, ~p"/api/v1/settings/email-confirmations", %{token: "invalid"})
     result = post(auth, ~p"/api/v1/settings/email-confirmations", %{token: "invalid"})
