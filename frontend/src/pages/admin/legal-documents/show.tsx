@@ -83,7 +83,10 @@ export default function AdminLegalShow() {
                       title={t("admin.legal.publish_title", { version: version.number })}
                       description={t("admin.legal.publish_body")}
                       confirmLabel={t("admin.legal.publish")}
-                      onConfirm={() => publish.mutate(version.number)}
+                      onConfirm={async () => {
+                        await publish.mutateAsync(version.number)
+                        toast.success(t("flash.legal.published"))
+                      }}
                     />
                   ),
               },
@@ -119,7 +122,7 @@ function VersionForm({ document }: { document: LegalDocument }) {
         try {
           await create.mutateAsync(input)
           form.reset({ ...input, note: "", publish: false })
-          toast.success(t("common.saved"))
+          toast.success(t(input.publish ? "flash.legal.published" : "common.saved"))
           setStep(0)
         } catch (error) {
           applyFormErrors(error, form.setError)

@@ -3,6 +3,7 @@ export interface AppConfig {
   tenancy: "multi" | "single"
   signupMode: "open" | "invite" | "closed"
   emailAvailable: boolean
+  jobsDashboard: boolean
   googleEnabled: boolean
   publicUrl: string
 }

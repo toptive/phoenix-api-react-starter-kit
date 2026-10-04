@@ -10,7 +10,7 @@ import type { TranslationValue } from "@/api/generated/serializers"
 import { translationSearchSchema } from "@/schemas/search"
 import { translationSchema } from "@/schemas/admin"
 import { applyFormErrors, fieldMessage } from "@/lib/form-errors"
-import { listHref } from "@/lib/pagination"
+import { listHref, listNavigation } from "@/lib/pagination"
 import { paths } from "@/lib/paths"
 import { PageHeader } from "@/components/app/page-header"
 import { SearchForm } from "@/components/app/search-form"
@@ -58,7 +58,7 @@ export default function AdminTranslationsIndex() {
           aria-label={t("admin.translations.filter_missing")}
           value={search.missing ?? ""}
           onChange={(event) => {
-            void navigate({ to: listHref(paths.adminTranslations, search, { missing: event.target.value }) })
+            void navigate(listNavigation(listHref(paths.adminTranslations, search, { missing: event.target.value })))
           }}
         >
           <NativeSelectOption value="">{t("admin.translations.all")}</NativeSelectOption>

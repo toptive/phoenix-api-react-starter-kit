@@ -31,6 +31,7 @@ export const bootstrap: Bootstrap = {
     signupMode: "open",
     emailAvailable: true,
     googleEnabled: true,
+    jobsDashboard: false,
     publicUrl: "https://starter.example",
   },
   flags: { billing: false },

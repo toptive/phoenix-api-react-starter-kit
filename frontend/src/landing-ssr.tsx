@@ -33,6 +33,7 @@ export async function render(locale = "en", legalPage?: LegalPage, pathname?: st
       signupMode: "open",
       emailAvailable: true,
       googleEnabled: false,
+      jobsDashboard: false,
       publicUrl: import.meta.env.VITE_PUBLIC_URL ?? "http://localhost:5173",
     },
     flags: { billing: false },

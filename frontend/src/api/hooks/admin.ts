@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient, keepPreviousData, type QueryClient } from "@tanstack/react-query"
 import { api, getToken, ADMIN_TOKEN_KEY } from "../http"
 import {
+  apiV1AdminJobsAccess,
   apiV1AdminDashboard,
   apiV1AdminUsers,
   apiV1AdminUsersImpersonation,
@@ -13,6 +14,7 @@ import {
   apiV1AdminAuditEvents,
 } from "../generated/routes"
 import type {
+  JobsAccess,
   AdminStats,
   User,
   AdminUserDetail,
@@ -158,4 +160,9 @@ export const useAuditEvents = (search: ListSearch) =>
     queryKey: qk.adminAudit(search),
     queryFn: ({ signal }) => api.get<AuditEvent[]>(apiV1AdminAuditEvents.index({ query: search }), { signal }),
     placeholderData: keepPreviousData,
+  })
+
+export const useJobsAccess = () =>
+  useMutation({
+    mutationFn: async () => (await api.post<JobsAccess>(apiV1AdminJobsAccess.create())).data,
   })

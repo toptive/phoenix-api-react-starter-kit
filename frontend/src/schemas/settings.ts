@@ -5,7 +5,6 @@ import { limits } from "./limits"
 export const profileSchema = (locales: string[]) =>
   z.object({
     name: z.string().trim().min(1, "validation.required").max(limits.nameMax, "validation.length_max"),
-    avatarKey: z.string().optional(),
     locale: z.string().refine((locale) => locales.includes(locale), "validation.inclusion"),
   })
 export const emailPreferencesSchema = z.object({ optionalEmails: z.boolean() })

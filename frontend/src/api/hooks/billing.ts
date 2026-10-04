@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api, ApiError } from "../http"
 import {
@@ -9,12 +10,15 @@ import type { BillingOverview, RedirectUrl } from "../generated/serializers"
 import { useAppConfig } from "./bootstrap"
 import { qk } from "../query-keys"
 import type { CheckoutInput } from "@/schemas/billing"
-export function useBilling() {
+export function useBilling(confirming = false) {
+  const [startedAt] = useState(() => Date.now())
   const { auth } = useAppConfig()
   return useQuery({
     queryKey: qk.organization(auth!.organization.id, "billing"),
     queryFn: async ({ signal }) => (await api.get<BillingOverview>(apiV1SettingsBilling.show(), { signal })).data,
     retry: false,
+    refetchInterval: (query) =>
+      confirming && !query.state.data?.subscription?.paid && Date.now() - startedAt < 60_000 ? 3_000 : false,
   })
 }
 export function useCheckout() {

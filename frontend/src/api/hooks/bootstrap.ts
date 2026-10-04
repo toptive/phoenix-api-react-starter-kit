@@ -1,3 +1,4 @@
+import { setSearchLocales } from "@/schemas/search"
 import { queryOptions, useQuery } from "@tanstack/react-query"
 import { api } from "../http"
 import { apiV1Bootstrap } from "../generated/routes"
@@ -7,7 +8,11 @@ import { qk } from "../query-keys"
 export const bootstrapOptions = () =>
   queryOptions({
     queryKey: qk.bootstrap,
-    queryFn: async ({ signal }) => (await api.get<Bootstrap>(apiV1Bootstrap.show(), { signal })).data,
+    queryFn: async ({ signal }) => {
+      const data = (await api.get<Bootstrap>(apiV1Bootstrap.show(), { signal })).data
+      setSearchLocales(data.locales)
+      return data
+    },
     staleTime: 30_000,
     retry: false,
   })

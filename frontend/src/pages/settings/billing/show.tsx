@@ -28,9 +28,9 @@ function statusKey(subscription: Subscription): string {
 }
 export default function BillingShow() {
   const { t, i18n } = useTranslation()
-  const query = useBilling()
   const portal = useBillingPortal()
   const { checkout } = billingSearchSchema.parse(useSearch({ strict: false }))
+  const query = useBilling(checkout === "done")
   const announced = useRef(false)
   useEffect(() => {
     if (checkout === "done" && !announced.current) {

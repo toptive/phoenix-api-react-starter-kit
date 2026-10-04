@@ -1,3 +1,6 @@
+import { useAppConfig } from "@/api/hooks/bootstrap"
+import { useJobsAccess } from "@/api/hooks/admin"
+import { FormError } from "@/components/app/form-error"
 import { Link } from "@/components/app/link"
 import { useLocation } from "@tanstack/react-router"
 import {
@@ -6,6 +9,7 @@ import {
   FileTextIcon,
   GaugeIcon,
   HistoryIcon,
+  ListTodoIcon,
   LanguagesIcon,
   UsersIcon,
 } from "lucide-react"
@@ -34,6 +38,8 @@ import { paths } from "@/lib/paths"
 /** Superadmin area. Separate shell so nobody confuses it with the product. */
 export function AdminLayout({ children }: { children: ReactNode }) {
   const { t } = useTranslation()
+  const { app } = useAppConfig()
+  const jobs = useJobsAccess()
   const { pathname: url } = useLocation()
 
   const nav = [
@@ -72,6 +78,28 @@ export function AdminLayout({ children }: { children: ReactNode }) {
             </SidebarGroup>
           </SidebarContent>
           <SidebarFooter>
+            {app.jobsDashboard && (
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    className="min-h-11"
+                    disabled={jobs.isPending}
+                    onClick={async () => {
+                      try {
+                        const { url } = await jobs.mutateAsync()
+                        window.open(url, "_blank", "noopener")
+                      } catch {
+                        /* The mutation error is displayed below. */
+                      }
+                    }}
+                  >
+                    <ListTodoIcon aria-hidden="true" />
+                    <span>{t("admin.nav.jobs")}</span>
+                  </SidebarMenuButton>
+                  <FormError error={jobs.error} />
+                </SidebarMenuItem>
+              </SidebarMenu>
+            )}
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild className="min-h-11">

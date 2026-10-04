@@ -13,3 +13,9 @@ export function listHref(
   })
   return `${path}?${query}`
 }
+
+/** Pass search separately so the router validates the destination parameters. */
+export function listNavigation(href: string) {
+  const url = new URL(href, window.location.origin)
+  return { to: url.pathname, search: Object.fromEntries(url.searchParams) }
+}

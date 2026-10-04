@@ -1,6 +1,15 @@
-import { describe, expect, it } from "vitest"
-import { listSearchSchema, translationSearchSchema, billingSearchSchema } from "./search"
+import { beforeEach, describe, expect, it } from "vitest"
+import { listSearchSchema, translationSearchSchema, billingSearchSchema, setSearchLocales } from "./search"
 describe("route search parameters", () => {
+  beforeEach(() => setSearchLocales(["en", "es"]))
+  it("uses bootstrap locales beyond the bundled catalogue", () => {
+    setSearchLocales(["en", "fr"])
+    expect(translationSearchSchema.parse({ missing: "fr", locale: "fr" })).toMatchObject({
+      missing: "fr",
+      locale: "fr",
+    })
+    expect(translationSearchSchema.parse({ missing: "es" }).missing).toBeUndefined()
+  })
   it("defaults, trims and drops parameters that do not belong to the route", () => {
     expect(listSearchSchema.parse({ q: "  Ana  ", missing: "es", unexpected: true })).toEqual({
       q: "Ana",

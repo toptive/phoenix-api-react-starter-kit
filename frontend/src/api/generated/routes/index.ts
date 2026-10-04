@@ -47,3 +47,4 @@ export { default as apiV1AdminLegalDocumentsVersionsPublication } from "./Api/V1
 export { default as apiV1AdminAuditEvents } from "./Api/V1/Admin/AuditEventsController"
 export { setBaseUrl, setUrlDefaults, addUrlDefault } from "./runtime"
 export type { RouteDefinition, RouteOptions, Method } from "./runtime"
+export { default as apiV1AdminJobsAccess } from "./Api/V1/Admin/JobsAccessController"

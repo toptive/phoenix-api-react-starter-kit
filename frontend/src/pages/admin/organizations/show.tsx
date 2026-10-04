@@ -20,6 +20,7 @@ export default function AdminOrganizationShow() {
       <title>{organization.name}</title>
       <PageHeader title={organization.name} description={organization.slug} />
       <DataTable
+        empty={<p>{t("admin.empty")}</p>}
         rows={memberships}
         rowKey={(m) => m.id}
         columns={[
