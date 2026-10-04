@@ -44,3 +44,8 @@ starter_kit-*.tar
 /priv/static/index.html
 /priv/static/en/
 /priv/static/es/
+
+# frontend build artefacts
+frontend/node_modules/
+frontend/dist/
+frontend/tsconfig.tsbuildinfo
