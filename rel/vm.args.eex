@@ -1,0 +1,18 @@
+## BEAM flags for a small app on a shared server (docs/PERFORMANCE.md).
+## Process table: 1M slots by default (~8 MB). 64k is plenty for one app.
++P 65536
+## Port/file-descriptor table: 65536 by default.
++Q 16384
+## Two schedulers: each scheduler owns allocator instances (≈15 MB each on a 10-core
+## host). Two are plenty for a small app; raise with ERL_AFLAGS="+S 4:4" if CPU-bound.
++S 2:2
++SDcpu 2:2
++SDio 4
+## Do not spin idle schedulers (saves CPU for the other apps on the box).
++sbwt none
++sbwtdcpu none
++sbwtdio none
+## Return freed carrier memory to the OS sooner.
++MBas aobf
++MHas aobf
++MMscs 0

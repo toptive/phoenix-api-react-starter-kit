@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Fast checks on the STAGED files. The full suite runs in pre-push (mix check).
+# Installed by `mix setup` (git config core.hooksPath .githooks).
+# A failure means: fix the code, not the rule.
+set -uo pipefail
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$staged" ] && exit 0
+
+failed=()
+run() {
+  local label="$1"; shift
+  echo "→ $label"
+  if ! "$@"; then failed+=("$label"); fi
+}
+
+ex_files=$(echo "$staged" | grep -E '\.(ex|exs|heex)$' || true)
+ts_files=$(echo "$staged" | grep -E '^assets/js/.*\.(ts|tsx)$' | grep -v '/generated/' || true)
+
+if [ -n "$ex_files" ]; then
+  run "mix format (staged)" mix format --check-formatted $ex_files
+  run "compile + boundary" mix compile --warnings-as-errors
+  run "credo (staged)" mix credo --strict $(echo "$ex_files" | grep -E '^(lib|credo)/' || echo lib/starter_kit.ex)
+fi
+
+if echo "$staged" | grep -qE '^(lib/starter_kit_web|config)/'; then
+  run "type contract (typelizer.check)" mix typelizer.check
+fi
+
+if echo "$staged" | grep -qE '^(lib|assets/js|i18n|config)/'; then
+  run "architecture tests" mix test test/architecture
+fi
+
+if [ -n "$ts_files" ]; then
+  run "eslint (staged)" pnpm exec eslint --max-warnings 0 --no-warn-ignored $ts_files
+fi
+
+if echo "$staged" | grep -q '^i18n/translations.csv$'; then
+  run "i18n locales rebuilt" bash -c 'pnpm i18n:build >/dev/null && git diff --exit-code --quiet -- i18n/locales'
+fi
+
+if [ ${#failed[@]} -gt 0 ]; then
+  echo ""
+  echo "✗ pre-commit failed: ${failed[*]}"
+  echo "  Fix the code, not the rules. (docs/GATES.md)"
+  exit 1
+fi

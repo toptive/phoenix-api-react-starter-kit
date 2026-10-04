@@ -1,0 +1,5 @@
+#!/bin/sh
+# Runs migrations, then syncs i18n/translations.csv into the translations table.
+set -eu
+cd -P -- "$(dirname -- "$0")"
+exec ./starter_kit eval StarterKit.Release.migrate_and_sync

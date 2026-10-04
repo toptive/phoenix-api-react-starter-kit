@@ -1,0 +1,9 @@
+#!/bin/sh
+# The Kamal container command (config/deploy.yml `cmd`). Kamal uploads the role env before
+# it starts the container, so migrations and the i18n sync run here, with that env, and the
+# server starts only after they succeed. A failed migration stops the container: the health
+# check fails and Kamal keeps the old version serving.
+set -eu
+cd -P -- "$(dirname -- "$0")"
+./migrate
+exec ./server

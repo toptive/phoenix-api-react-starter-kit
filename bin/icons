@@ -1,0 +1,36 @@
+#!/usr/bin/env sh
+# Builds the app icons from priv/static/favicon.svg. Run it after you change the favicon:
+#
+#   bin/icons [background]     # background of the opaque icons, default: white
+#
+# Writes priv/static/favicon.ico (16/32/48), apple-touch-icon.png (180, opaque: iOS shows
+# transparency as black), icon-192.png / icon-512.png (the web app manifest) and
+# images/mail/logo.png (the email header).
+# Needs rsvg-convert and ImageMagick (`brew install librsvg imagemagick`).
+set -eu
+
+cd "$(dirname "$0")/.."
+svg=priv/static/favicon.svg
+bg=${1:-white}
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+for size in 16 32 48; do
+  rsvg-convert -w "$size" -h "$size" "$svg" -o "$tmp/$size.png"
+done
+
+magick "$tmp/16.png" "$tmp/32.png" "$tmp/48.png" priv/static/favicon.ico
+
+# Opaque icons: the mark at 80% on the background, so launchers can crop to a circle.
+icon() {
+  rsvg-convert -w "$(($1 * 4 / 5))" -h "$(($1 * 4 / 5))" "$svg" -o "$tmp/mark.png"
+  magick -size "$1x$1" "xc:$bg" "$tmp/mark.png" -gravity center -composite -strip "PNG24:$2"
+}
+icon 180 priv/static/apple-touch-icon.png
+icon 192 priv/static/icon-192.png
+icon 512 priv/static/icon-512.png
+
+# The email header mark: 96 px, shown at 32 px (mail clients do not show SVG).
+rsvg-convert -w 96 -h 96 "$svg" -o priv/static/images/mail/logo.png
+
+ls -l priv/static/images/mail/logo.png priv/static/favicon.ico priv/static/apple-touch-icon.png priv/static/icon-192.png priv/static/icon-512.png

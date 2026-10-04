@@ -1,0 +1,5 @@
+This file marks the Toptive base template itself. bin/rename deletes it.
+
+While it exists, test/*_web/placeholder_test.exs skips its launch checks (the template
+placeholders are expected here) and checks only that its recorded template fingerprints
+are current. In a product, those launch checks fail until every placeholder is replaced.

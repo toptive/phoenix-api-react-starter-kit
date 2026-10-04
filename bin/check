@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Every gate (`mix check`, docs/GATES.md), then the gate stamp: when the gates pass on a
+# clean tree, <git dir>/mix-check-passed holds the HEAD sha. The Kamal pre-build hook skips
+# its own `mix check` when the stamp equals HEAD, because that exact commit already passed.
+# Used by .githooks/pre-push and the /deploy skill. Extra arguments go to `mix check`.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+stamp="$(git rev-parse --git-dir)/mix-check-passed"
+rm -f "$stamp"
+head=$(git rev-parse HEAD)
+clean_before=$(git status --porcelain)
+
+mix check --no-retry "$@"
+
+if [ -z "$clean_before" ] && [ -z "$(git status --porcelain)" ] && [ "$(git rev-parse HEAD)" = "$head" ]; then
+  echo "$head" > "$stamp"
+  echo "→ gate stamp written for $head"
+else
+  echo "→ no gate stamp: the tree had uncommitted changes (the pre-build hook will run mix check)"
+fi

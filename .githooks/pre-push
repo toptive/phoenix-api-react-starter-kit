@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Every gate, every push (docs/GATES.md). There is no CI: this IS the CI.
+# Escape hatch only for emergencies: git push --no-verify — never weaken a gate instead.
+set -uo pipefail
+
+# Git passes "<local ref> <local sha> <remote ref> <remote sha>" per pushed ref on stdin.
+# A push that only deletes branches (every local sha is all zeros) ships no code: skip the gates.
+zero_sha="0000000000000000000000000000000000000000"
+pushes_code=false
+refs_seen=false
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  refs_seen=true
+  [ "$local_sha" != "$zero_sha" ] && pushes_code=true
+done
+if [ "$refs_seen" = true ] && [ "$pushes_code" = false ]; then
+  echo "→ delete-only push, skipping mix check"
+  exit 0
+fi
+
+# Child tools may run git in their own repositories (for example the advisory DB).
+# Do not carry this hook's repository-local Git environment into those commands.
+while IFS= read -r name; do
+  unset "$name"
+done < <(git rev-parse --local-env-vars)
+
+# mix check includes `mix typelizer.check` (the type contract). bin/check also writes the
+# gate stamp that lets the Kamal pre-build hook skip a second run for the same commit.
+echo "→ mix check (all gates)"
+if ! bin/check; then
+  echo ""
+  echo "✗ pre-push failed. Fix the failing gate above, then push again."
+  exit 1
+fi

@@ -1,0 +1,155 @@
+<%
+  # Billing (docs/BILLING.md § Deploy): "off", "test" (only operators can pay, with Stripe
+  # test cards) or "live". Every kamal command checks the setup here and stops on a gap, so
+  # a deploy never turns billing on without its keys and prices.
+  billing = "off"
+  billing_prices = { "PRO_MONTHLY" => "price_CHANGE_ME", "PRO_YEARLY" => "price_CHANGE_ME" }
+  billing_test_operator_user_ids = "" # test mode: user ids that may pay, comma-separated
+  billing_renewal_notices = false
+
+  raise "billing must be \"off\", \"test\" or \"live\"" unless %w[off test live].include?(billing)
+  billing_mode = billing.upcase
+  billing_secrets = %W[STRIPE_#{billing_mode}_SECRET_KEY STRIPE_#{billing_mode}_WEBHOOK_SECRET]
+
+  # Bot protection (docs/AUTH.md § Bot protection): true = sign-up and "email me a link"
+  # need a Cloudflare Turnstile check. The two keys must be in .kamal/secrets.
+  turnstile = false
+  turnstile_secrets = %w[TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY]
+
+  if turnstile
+    kamal_secrets = File.read(".kamal/secrets")
+    turnstile_secrets.each do |name|
+      raise "turnstile: add #{name} to .kamal/secrets" unless kamal_secrets.match?(/^#{name}=\S/)
+    end
+  end
+
+  if billing != "off"
+    kamal_secrets = File.read(".kamal/secrets")
+    billing_secrets.each do |name|
+      raise "billing #{billing}: add #{name} to .kamal/secrets" unless kamal_secrets.match?(/^#{name}=\S/)
+    end
+    billing_prices.each do |offer, price|
+      raise "billing #{billing}: set the Stripe price of #{offer}" unless price.match?(/\Aprice_\w+\z/) && !price.include?("CHANGE_ME")
+    end
+  end
+%>
+# Kamal 2 — one app on the Toptive products server (docs/NEW_SERVER.md, docs/DEPLOY.md):
+# DigitalOcean droplet toptive-products-nyc3-01 (2 vCPU, 4 GB, x86_64, nyc3).
+# Replace every CHANGE_ME. Secrets are listed in .kamal/secrets (references only).
+
+service: starter_kit
+image: toptive/starter_kit
+
+servers:
+  web:
+    # Migrations + the i18n sync run at boot, then the server (rel/overlays/bin/launch).
+    cmd: /app/bin/launch
+    hosts:
+      # toptive-products-nyc3-01 (public IP; the app reaches Postgres on the Docker network)
+      - 209.97.156.205
+    options:
+      # Hard memory cap: the app idles well under this (docs/PERFORMANCE.md).
+      memory: 400m
+
+proxy:
+  ssl: true
+  host: CHANGE_ME.example.com
+  app_port: 4000
+  forward_headers: true
+  healthcheck:
+    path: /health
+    interval: 3
+    timeout: 5
+
+# Local registry: Kamal pushes the image to the server through SSH (no external registry).
+registry:
+  server: localhost:5555
+
+builder:
+  # The droplet is x86_64. On an Apple-silicon Mac the image is cross-built for amd64
+  # (Docker/OrbStack emulation; slower than a native build, fine for this app). To build
+  # on an x86 machine instead, add `remote: ssh://root@<x86 builder>` — not the products
+  # droplet: a build there competes with the apps for its 4 GB.
+  arch: amd64
+  args:
+    # Build-stage BEAM flags (Dockerfile ARG ERL_FLAGS). The amd64 build runs under QEMU on
+    # Apple silicon, where the dual-mapped JIT crashes the BEAM: +JMsingle avoids it.
+    ERL_FLAGS: "+JMsingle true +S 2:2"
+
+env:
+  clear:
+    PHX_HOST: CHANGE_ME.example.com
+    APP_NAME: StarterKit
+    POOL_SIZE: 8
+    # Indexing lock: "0" = noindex everywhere, robots Disallow: /, empty sitemap.
+    # Set "1" on launch day (docs/SEO.md).
+    SITE_INDEXING: "0"
+    # Who may create an account: invite (only invited emails) until launch, then open.
+    # closed = nobody new. The first admin: docs/ADMIN.md (bootstrap_admin).
+    SIGNUP_MODE: invite
+    # The kamal Docker network: X-Forwarded-For counts only from kamal-proxy, and
+    # CF-Connecting-IP only through it from Cloudflare (StarterKitWeb.Plugs.ClientIp).
+    # Check the subnet on the server: docker network inspect kamal
+    TRUSTED_PROXY_CIDRS: 172.18.0.0/16
+    OBAN_DEFAULT_CONCURRENCY: 5
+    OBAN_MARKETING_CONCURRENCY: 2
+    SSR_POOL_SIZE: 1
+    MAIL_FROM: hello@CHANGE_ME.example.com
+    MAIL_FROM_NAME: StarterKit
+    # A staging or preview deploy: mail only to these addresses (comma list, *@domain).
+    # MAIL_ALLOWED_RECIPIENTS: "*@toptive.co"
+    S3_BUCKET: CHANGE_ME
+    # DigitalOcean Spaces (S3-compatible); SDKs sign with region us-east-1.
+    S3_ENDPOINT: https://nyc3.digitaloceanspaces.com
+    S3_REGION: us-east-1
+    # Analytics, with the POSTHOG_API_KEY secret: the PostHog project's region host,
+    # https://us.i.posthog.com or https://eu.i.posthog.com (no default; boot fails without it).
+    # POSTHOG_HOST: https://us.i.posthog.com
+<% if turnstile %>
+    # Bot protection: written from the switch at the top of this file. The widget's
+    # hostname is PHX_HOST; set TURNSTILE_HOSTNAME when it differs.
+    TURNSTILE_REQUIRED: "true"
+<% end %>
+<% if billing != "off" %>
+    # Billing: written from the switch at the top of this file.
+    BILLING_ENABLED: "true"
+    BILLING_MODE: <%= billing %>
+    BILLING_RENEWAL_NOTICES: "<%= billing_renewal_notices %>"
+    BILLING_TEST_OPERATOR_USER_IDS: "<%= billing_test_operator_user_ids %>"
+<% billing_prices.each do |offer, price| %>
+    STRIPE_<%= billing_mode %>_PRICE_<%= offer %>: <%= price %>
+<% end %>
+<% end %>
+  secret:
+    - SECRET_KEY_BASE
+    - DATABASE_URL
+    - POSTMARK_API_KEY
+    - SENTRY_DSN
+    - OPENROUTER_API_KEY
+    - FAL_KEY
+    - GOOGLE_API_KEY
+    - GOOGLE_CLIENT_ID
+    - GOOGLE_CLIENT_SECRET
+    - S3_ACCESS_KEY_ID
+    - S3_SECRET_ACCESS_KEY
+    - POSTHOG_API_KEY
+<% if turnstile %>
+<% turnstile_secrets.each do |name| %>
+    - <%= name %>
+<% end %>
+<% end %>
+<% if billing != "off" %>
+<% billing_secrets.each do |name| %>
+    - <%= name %>
+<% end %>
+<% end %>
+
+# The app joins the `kamal` network, where the shared Postgres container answers as
+# `postgres` (one database per app; see docs/NEW_SERVER.md).
+
+aliases:
+  console: app exec --interactive --reuse "/app/bin/starter_kit remote"
+  logs: app logs -f
+  migrate: app exec --primary "/app/bin/migrate"
+
+retain_containers: 3

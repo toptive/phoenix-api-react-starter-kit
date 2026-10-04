@@ -1,0 +1,20 @@
+# Sobelow (the Brakeman equivalent). Findings are fixed, or skipped ONE AT A TIME with
+# a reason: inline `# sobelow_skip ["Check.Name"]` + a comment for code, and here only
+# for config-level checks. Every entry is also listed in docs/SECURITY.md.
+[
+  verbose: false,
+  private: false,
+  skip: true,
+  router: "lib/starter_kit_web/router.ex",
+  exit: "low",
+  format: "txt",
+  threshold: "low",
+  ignore: [
+    # Config.HTTPS: TLS terminates at kamal-proxy (Let's Encrypt). force_ssl in the app
+    # would redirect kamal-proxy's plain-HTTP health checks. HSTS is sent by
+    # StarterKitWeb.Plugs.SecurityHeaders in production.
+    "Config.HTTPS"
+  ],
+  ignore_files: [],
+  version: false
+]

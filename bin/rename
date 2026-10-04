@@ -1,0 +1,98 @@
+#!/usr/bin/env elixir
+# Turns the template into a product. Run once, right after "Use this template":
+#
+#   bin/rename --app visa_hub --module VisaHub --name "WH Visas" --domain whvisas.com
+#
+# It rewrites every tracked text file and path:
+#   starter_kit / StarterKit / starter-kit  → your app / module / kebab name
+#   the display name "StarterKit"            → --name
+#   CHANGE_ME.example.com / example.com mail → --domain
+# and regenerates the cookie salts and the dev/test secret keys, so no two products
+# share them. It deletes the .template-repo marker, which turns on the launch checks of
+# placeholder_test.exs. Commit the result as one commit ("Rename the template to …").
+# Checklist of what else to change: docs/NEW_PRODUCT.md.
+
+{opts, _, _} =
+  OptionParser.parse(System.argv(), strict: [app: :string, module: :string, name: :string, domain: :string, dry_run: :boolean])
+
+app = opts[:app] || raise "--app is required (snake_case, e.g. visa_hub)"
+module = opts[:module] || Macro.camelize(app)
+name = opts[:name] || module
+domain = opts[:domain] || "example.com"
+kebab = String.replace(app, "_", "-")
+
+unless app =~ ~r/^[a-z][a-z0-9_]*$/, do: raise("--app must be snake_case")
+unless module =~ ~r/^[A-Z][A-Za-z0-9]*$/, do: raise("--module must be CamelCase")
+
+random = fn bytes -> bytes |> :crypto.strong_rand_bytes() |> Base.encode64(padding: false) |> binary_part(0, bytes) end
+
+{files, 0} = System.cmd("git", ["ls-files"])
+
+files =
+  files
+  |> String.split("\n", trim: true)
+  |> Enum.reject(&String.match?(&1, ~r/\.(png|jpg|jpeg|gif|ico|woff2?|lock)$|^bin\/rename$|pnpm-lock\.yaml$/))
+
+replacements = [
+  # display name first (quoted "StarterKit" strings and prose)
+  {~r/"StarterKit"/, ~s("#{name}")},
+  {~r/StarterKit —/, "#{name} —"},
+  {"CHANGE_ME.example.com", domain},
+  {"hello@example.com", "hello@#{domain}"},
+  {"toptive/starter_kit", "toptive/#{app}"},
+  {"StarterKitWeb", "#{module}Web"},
+  {"StarterKit", module},
+  {"starter_kit", app},
+  {"starter-kit", kebab}
+]
+
+salts = [
+  {~r/signing_salt: "[^"]+"/, fn -> ~s(signing_salt: "#{random.(8)}") end},
+  {~r/encryption_salt: "[^"]+"/, fn -> ~s(encryption_salt: "#{random.(8)}") end},
+  {~r/secret_key_base: "[^"]+"/, fn -> ~s(secret_key_base: "#{random.(64)}") end}
+]
+
+changed =
+  for file <- files, File.regular?(file), content = File.read!(file), String.valid?(content), reduce: 0 do
+    count ->
+      new =
+        Enum.reduce(replacements, content, fn
+          {%Regex{} = re, to}, acc -> Regex.replace(re, acc, to)
+          {from, to}, acc -> String.replace(acc, from, to)
+        end)
+
+      new = Enum.reduce(salts, new, fn {re, fun}, acc -> Regex.replace(re, acc, fn _ -> fun.() end) end)
+
+      if new != content do
+        unless opts[:dry_run], do: File.write!(file, new)
+        count + 1
+      else
+        count
+      end
+  end
+
+ancestors = fn file ->
+  file |> Path.split() |> Enum.scan(&Path.join(&2, &1)) |> Enum.drop(-1)
+end
+
+moves =
+  files
+  |> Enum.flat_map(ancestors)
+  |> Enum.concat(files)
+  |> Enum.uniq()
+  |> Enum.filter(&String.contains?(Path.basename(&1), "starter_kit"))
+  |> Enum.sort_by(&(-length(Path.split(&1))))
+
+for path <- moves, File.exists?(path) do
+  target = Path.join(Path.dirname(path), String.replace(Path.basename(path), "starter_kit", app))
+  unless opts[:dry_run], do: File.rename!(path, target)
+end
+
+# The product is no longer the template: the launch checks in placeholder_test.exs start.
+unless opts[:dry_run], do: File.rm(".template-repo")
+
+IO.puts("""
+Renamed to #{module} (#{app}), "#{name}", #{domain}: #{changed} files rewritten, #{length(moves)} paths moved.
+Next: mix setup, then follow docs/NEW_PRODUCT.md. placeholder_test.exs fails until the
+favicon (bin/icons), the social cards (bin/og-cards.mjs) and the deploy hosts are your own.
+""")

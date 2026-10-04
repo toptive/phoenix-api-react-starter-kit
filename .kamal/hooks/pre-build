@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Kamal pre-build hook.
+# 1. Refuses to build when a gate fails. When bin/check already passed for this exact HEAD
+#    (the gate stamp in <git dir>/mix-check-passed), the gates are not run a second time:
+#    Kamal builds from a clean clone of HEAD, so the same commit is what passed.
+# 2. The gates run WITHOUT the production secrets: Kamal exports them to this hook, and a
+#    failing test or a crash dump must never print one. Every name in .kamal/secrets is
+#    removed from the environment of `mix check`.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+
+stamp="$(git rev-parse --git-dir)/mix-check-passed"
+
+if [ "${SKIP_GATES:-}" = "1" ]; then
+  echo "[pre-build] SKIP_GATES=1: gates skipped"
+elif [ -f "$stamp" ] && [ "$(cat "$stamp")" = "$(git rev-parse HEAD)" ]; then
+  echo "[pre-build] gates already passed for $(git rev-parse --short HEAD) (gate stamp)"
+else
+  unset_args=()
+  while IFS= read -r name; do
+    unset_args+=(-u "$name")
+  done < <(sed -n 's/^\([A-Z_][A-Z0-9_]*\)=.*/\1/p' .kamal/secrets)
+
+  echo "[pre-build] mix check (all gates, ${#unset_args[@]} secret names removed from the env)"
+  env "${unset_args[@]}" bin/check
+fi

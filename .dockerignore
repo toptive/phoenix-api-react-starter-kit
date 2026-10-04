@@ -1,0 +1,17 @@
+.git
+.githooks
+.claude
+.elixir_ls
+_build
+deps
+node_modules
+priv/static/assets
+priv/ssr
+priv/plts
+cover
+tmp
+test
+docs
+*.md
+.env*
+erl_crash.dump
