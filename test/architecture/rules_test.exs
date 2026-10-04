@@ -71,7 +71,18 @@ defmodule StarterKit.ArchitectureTest do
           do: path
 
     assert offenders == [],
-           "render JSON with render_data/3 or render_error/4: #{inspect(offenders)}"
+           "render JSON with render_data/3, render_collection/4 or render_error/4: #{inspect(offenders)}"
+  end
+
+  test "only envelope helpers call json/2" do
+    source = File.read!("lib/starter_kit_web/responses.ex")
+
+    offenders =
+      for {:def, _, [{name, _, _args}, body]} <- defs(source),
+          calls?(body, [:json]) and name not in [:render_data, :render_collection, :render_error],
+          do: name
+
+    assert offenders == []
   end
 
   test "Oban uses the default and marketing queues only" do

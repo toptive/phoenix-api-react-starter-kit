@@ -5,13 +5,12 @@ defmodule StarterKitWeb.Plugs.VerifyTurnstile do
 
       plug StarterKitWeb.Plugs.VerifyTurnstile, "registration" when action == :create
 
-  The token comes as `user[turnstileToken]`. A refused check halts with a translated error
-  on `turnstileToken` and goes back to the form; the action never runs. Off = no-op.
+  The API token comes as flat `turnstileToken`; legacy nested params remain supported.
+  A refused check returns 422 validation message keys for API requests before the action
+  runs. Unconverted browser requests redirect to the SPA. Off = no-op.
   """
 
   @behaviour Plug
-
-  use StarterKitWeb, :verified_routes
 
   import Plug.Conn
   import Phoenix.Controller, only: [redirect: 2]
@@ -32,6 +31,7 @@ defmodule StarterKitWeb.Plugs.VerifyTurnstile do
     token =
       case conn.params do
         %{"user" => %{"turnstile_token" => token}} -> token
+        %{"turnstile_token" => token} -> token
         _ -> nil
       end
 
@@ -40,14 +40,23 @@ defmodule StarterKitWeb.Plugs.VerifyTurnstile do
         conn
 
       {:error, :verification_required} ->
-        conn
-        |> skip_authorization()
-        |> assign_error(:turnstile_token, "validation.turnstile_required")
-        |> redirect(to: form_path(action))
-        |> halt()
+        conn = skip_authorization(conn)
+
+        if String.starts_with?(conn.request_path, "/api/") do
+          conn
+          |> StarterKitWeb.Responses.render_error(422, :validation_failed, %{
+            turnstile_token: ["validation.turnstile_required"]
+          })
+          |> halt()
+        else
+          conn
+          |> assign_error(:turnstile_token, "validation.turnstile_required")
+          |> redirect(external: form_path(action))
+          |> halt()
+        end
     end
   end
 
-  defp form_path("registration"), do: ~p"/registration/new"
-  defp form_path("magic_link"), do: ~p"/session/new"
+  defp form_path("registration"), do: StarterKitWeb.ApiAuth.spa_url("/auth/registration")
+  defp form_path("magic_link"), do: StarterKitWeb.ApiAuth.spa_url("/auth/session")
 end

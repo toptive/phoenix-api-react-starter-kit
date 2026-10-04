@@ -192,7 +192,7 @@ defmodule StarterKitWeb.UserAuth do
       conn
       |> Responses.put_flash_t(:error, "flash.reauthenticate")
       |> maybe_store_return_to()
-      |> redirect(to: ~p"/session/new")
+      |> redirect(external: Responses.spa_sign_in_url())
       |> halt()
     end
   end
@@ -214,7 +214,7 @@ defmodule StarterKitWeb.UserAuth do
       conn
       |> Responses.put_flash_t(:error, "flash.sign_in_required")
       |> maybe_store_return_to()
-      |> redirect(to: ~p"/session/new")
+      |> redirect(external: Responses.spa_sign_in_url())
       |> halt()
     end
   end

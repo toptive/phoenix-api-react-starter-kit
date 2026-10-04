@@ -1,5 +1,12 @@
 import Config
 
+config :starter_kit,
+  spa_origin: System.get_env("SPA_ORIGIN", "http://localhost:5173"),
+  cors_origins:
+    System.get_env("CORS_ORIGINS", System.get_env("SPA_ORIGIN", "http://localhost:5173"))
+    |> String.split(",", trim: true)
+    |> Enum.map(&String.trim/1)
+
 # Runtime configuration: read from the environment at boot (dev, test and releases).
 # Production env vars are listed in config/deploy.yml and docs/DEPLOY.md.
 
@@ -94,11 +101,11 @@ if config_env() != :test do
         do: {String.replace_prefix(name, price_prefix, ""), String.trim(value)}
       )
 
-  if google_id = env.("GOOGLE_CLIENT_ID") do
+  if env.("GOOGLE_CLIENT_ID") && env.("GOOGLE_CLIENT_SECRET") do
     config :starter_kit, google_auth: true
 
     config :ueberauth, Ueberauth.Strategy.Google.OAuth,
-      client_id: google_id,
+      client_id: env.("GOOGLE_CLIENT_ID"),
       client_secret: env.("GOOGLE_CLIENT_SECRET")
   end
 

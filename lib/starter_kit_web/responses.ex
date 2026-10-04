@@ -10,6 +10,9 @@ defmodule StarterKitWeb.Responses do
   alias StarterKit.I18n
   alias StarterKitWeb.Plugs.PublicPage
 
+  @doc "SPA sign-in destination for unconverted browser areas."
+  def spa_sign_in_url, do: StarterKitWeb.ApiAuth.spa_url("/auth/session")
+
   @doc "The current scope."
   def scope(conn), do: conn.assigns[:current_scope]
 
@@ -56,25 +59,59 @@ defmodule StarterKitWeb.Responses do
     end
   end
 
-  @doc "`/api/v1` success envelope: `{ data, meta? }`."
-  def render_data(conn, data, opts \\ []) do
-    body = %{data: data} |> then(&if(opts[:meta], do: Map.put(&1, :meta, opts[:meta]), else: &1))
+  @doc "Success envelope. Pass a serialized map or `{serializer, value}`."
+  def render_data(conn, data, meta \\ %{}) do
+    data =
+      case data do
+        {serializer, value} -> serializer.serialize(value)
+        value -> value
+      end
 
-    conn
-    |> put_status(opts[:status] || 200)
-    |> json(body)
+    json(conn, %{data: camelize(data), meta: camelize(meta)})
   end
 
-  @doc "`/api/v1` error envelope: `{ error: { code, message, details } }`."
+  @doc "Serializes a collection with pagination metadata."
+  def render_collection(conn, list, serializer, page_meta) do
+    render_data(conn, serializer.serialize_many(list), page_meta)
+  end
+
+  @doc "Stable error code, translated message and camelCase details."
   def render_error(conn, status, code, details \\ %{}) do
-    conn
-    |> put_status(status)
-    |> json(%{
+    conn |> put_status(status) |> json(error_body(conn, code, details))
+  end
+
+  @doc "Shared error envelope for last-resort Phoenix error rendering."
+  def error_body(conn, code, details \\ %{}) do
+    %{
       error: %{
         code: to_string(code),
         message: t(conn, "errors.api.#{code}"),
-        details: details
+        details: camelize(details)
       }
-    })
+    }
+  end
+
+  @doc "Returns all changeset message keys as a 422 validation failure."
+  def render_validation_error(conn, changeset) do
+    render_error(conn, 422, :validation_failed, I18n.changeset_error_keys(changeset))
+  end
+
+  defp camelize(%{__struct__: _} = value), do: value
+
+  defp camelize(map) when is_map(map),
+    do: Map.new(map, fn {key, value} -> {camel_key(key), camelize(value)} end)
+
+  defp camelize(list) when is_list(list), do: Enum.map(list, &camelize/1)
+  defp camelize(value), do: value
+
+  defp camel_key(key) do
+    key = to_string(key)
+
+    if Regex.match?(~r/^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/, key) do
+      [first | rest] = String.split(key, "_")
+      first <> Enum.map_join(rest, &String.capitalize/1)
+    else
+      key
+    end
   end
 end

@@ -17,7 +17,7 @@ defmodule StarterKitWeb.Settings.EmailController do
     case Accounts.request_email_change(
            scope(conn),
            params,
-           &url(~p"/settings/email-confirmations/#{&1}")
+           &StarterKitWeb.ApiAuth.spa_url("/settings/email-confirmations/#{&1}")
          ) do
       {:ok, applied} ->
         conn

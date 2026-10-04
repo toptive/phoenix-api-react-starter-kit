@@ -175,7 +175,7 @@ defmodule StarterKitWeb.BillingTest do
       body = ~s({"id":"evt_1",  "type":"invoice.paid", "livemode":false})
       conn = post_event(conn, body, Webhook.sign(body, "whsec_test_fake"))
 
-      assert json_response(conn, 200) == %{"data" => %{"received" => true}}
+      assert json_response(conn, 200) == %{"data" => %{"received" => true}, "meta" => %{}}
     end
 
     test "a bad signature is refused with 400", %{conn: conn} do

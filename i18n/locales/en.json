@@ -524,5 +524,21 @@
   "validation.terms_required": "Accept the terms and the privacy policy to create your account.",
   "validation.turnstile_required": "We couldn't confirm that you're a person. Wait for the security check to finish, then send the form again.",
   "validation.unique": "This is already taken.",
-  "validation.unsafe_unique": "This is already taken."
+  "validation.unsafe_unique": "This is already taken.",
+  "errors.api.validation_failed": "Some fields need a fix.",
+  "errors.api.rate_limited": "Too many attempts. Wait a minute and try again.",
+  "errors.api.sudo_required": "Sign in again to continue.",
+  "errors.api.invalid_credentials": "Your email or password is not correct.",
+  "errors.api.invalid_token": "This link has expired. Ask for a new one.",
+  "errors.api.signup_closed": "New accounts are not available yet.",
+  "errors.api.invitation_required": "You need an invitation to create an account.",
+  "errors.api.email_unavailable": "Email is not available right now. Try again later.",
+  "errors.api.oauth_failed": "We could not sign you in with Google. Try again.",
+  "validation.invalid": "This value is not valid.",
+  "flash.magic_link_sent": "If your account is available, check your inbox for a sign-in link.",
+  "mail.password_reset.subject": "Reset your password for {{app}}",
+  "mail.password_reset.headline": "Choose a new password",
+  "mail.password_reset.lead": "Use the button to choose a new password. This link expires in 15 minutes.",
+  "mail.password_reset.action": "Reset password",
+  "mail.password_reset.note1": "Did not ask for this link? Ignore this email."
 }

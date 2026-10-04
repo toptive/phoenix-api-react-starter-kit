@@ -39,6 +39,7 @@ defmodule StarterKit.Notifications do
 
   @kinds %{
     "magic_link" => :access,
+    "password_reset" => :access,
     "email_change" => :access,
     "invitation" => :transactional,
     "renewal_notice" => :transactional,

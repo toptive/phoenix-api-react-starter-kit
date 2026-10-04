@@ -108,6 +108,15 @@ defmodule StarterKit.I18n do
     end)
   end
 
+  @doc "Changeset errors as message keys for JSON clients."
+  def changeset_error_keys(changeset) do
+    Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
+      if String.starts_with?(message, "validation."),
+        do: message,
+        else: error_key(opts) || "validation.invalid"
+    end)
+  end
+
   @doc "All changeset errors as `%{field => first message}` (Inertia form errors)."
   def translate_changeset_errors(%Ecto.Changeset{} = changeset, locale) do
     changeset

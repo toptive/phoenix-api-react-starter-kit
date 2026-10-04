@@ -12,11 +12,25 @@ defmodule StarterKitWeb.Plugs.ErrorResponses do
 
   import Plug.Conn
 
+  alias StarterKitWeb.Plugs.ApiLocale
+
   @impl true
   def init(opts), do: opts
 
   @impl true
-  def call(conn, _opts), do: register_before_send(conn, &mark_error/1)
+  def call(conn, _opts) do
+    conn =
+      if String.starts_with?(conn.request_path, "/api/") do
+        conn
+        |> Phoenix.Controller.put_format("json")
+        |> fetch_query_params()
+        |> ApiLocale.call([])
+      else
+        conn
+      end
+
+    register_before_send(conn, &mark_error/1)
+  end
 
   defp mark_error(%Plug.Conn{status: status} = conn) when is_integer(status) and status >= 400 do
     conn

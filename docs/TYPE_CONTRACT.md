@@ -5,10 +5,13 @@ generates the TypeScript from it, so types cannot drift.
 
 | Source | Generates | Import |
 |---|---|---|
-| `lib/starter_kit_web/serializers/serializers.ex` | `assets/js/generated/serializers/*.ts` | `import type { User } from "@/generated/serializers"` |
-| `StarterKitWeb.Router` | `assets/js/generated/routes/*.ts` | `routes.settingsProfile.edit().url` |
-| `page "…", props: […]` in controllers | `assets/js/generated/pages/**/*.props.ts` | `import type { SettingsMembersIndexProps } from "@/generated/pages"` |
-| `shared …` in `Plugs.InertiaShare` | `pages/shared.props.ts` | `useSharedProps()` |
+| `lib/starter_kit_web/serializers/*.ex` | `frontend/src/api/generated/serializers/*.ts` | `import type { User } from "@/api/generated/serializers"` |
+| `StarterKitWeb.Router` | `frontend/src/api/generated/routes/*.ts` | `routes.apiV1AuthSession.create().url` |
+
+The pages generator is disabled. Existing Inertia declarations and runtime validation remain
+for unconverted areas; their old `assets/js/generated` output is a compatibility snapshot.
+New API controllers use serializers only. The flat catalogue response type is the generated
+`Locale["translations"]`; bootstrap and auth session data use `Bootstrap` and `AuthSession`.
 
 ## Workflow
 

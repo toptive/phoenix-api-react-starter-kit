@@ -1,13 +1,10 @@
 defmodule StarterKitWeb.TurnstileTest do
   use StarterKitWeb.ConnCase, async: true
-
   import Swoosh.TestAssertions
-
   alias StarterKit.{AbuseProtection, Accounts}
 
   setup %{conn: conn} do
     put_flag(:turnstile, true)
-    # Own IP per test: the auth rate limits count per client.
     %{conn: %{conn | remote_ip: {192, 0, 2, rem(System.unique_integer([:positive]), 250)}}}
   end
 
@@ -15,21 +12,24 @@ defmodule StarterKitWeb.TurnstileTest do
   defp accept(action), do: answer(%{success: true, hostname: "app.example.com", action: action})
 
   defp sign_up(conn, email, token) do
-    user = %{"name" => "Ana", "email" => email, "termsAccepted" => true, "turnstileToken" => token}
-    post(conn, ~p"/registration", %{"user" => user})
+    post(conn, ~p"/api/v1/auth/registrations", %{
+      name: "Ana",
+      email: email,
+      termsAccepted: true,
+      turnstileToken: token
+    })
   end
 
-  test "sign-up without a passing check creates no account and sends no email", %{conn: conn} do
+  test "a refused challenge creates no account or email", %{conn: conn} do
     email = unique_email()
     answer(%{success: false})
 
     for token <- [nil, "rejected"] do
       result = sign_up(conn, email, token)
 
-      assert redirected_to(result) == ~p"/registration/new"
-
-      assert get_session(result, "inertia_errors")["turnstile_token"] =~
-               "confirm that you're a person"
+      assert json_response(result, 422)["error"]["details"]["turnstileToken"] == [
+               "validation.turnstile_required"
+             ]
 
       refute Accounts.get_user_by_email(email)
     end
@@ -37,64 +37,60 @@ defmodule StarterKitWeb.TurnstileTest do
     assert_no_email_sent()
   end
 
-  test "sign-up with a passing check creates the account", %{conn: conn} do
+  test "a passing challenge creates the account", %{conn: conn} do
     accept("registration")
     email = unique_email()
-
-    assert redirected_to(sign_up(conn, email, "valid")) == ~p"/session/new"
+    assert json_response(sign_up(conn, email, "valid"), 201)
     assert Accounts.get_user_by_email(email)
     assert_email_sent()
   end
 
-  test "a token for another action does not pass", %{conn: conn} do
+  test "a challenge for another action fails", %{conn: conn} do
     accept("magic_link")
     email = unique_email()
-
-    assert redirected_to(sign_up(conn, email, "valid")) == ~p"/registration/new"
+    assert json_response(sign_up(conn, email, "valid"), 422)
     refute Accounts.get_user_by_email(email)
   end
 
-  test "\"email me a link\" needs the check; the emailed link stays one click", %{conn: conn} do
+  test "magic requests need a challenge but spending an emailed token does not", %{conn: conn} do
     user = user_fixture()
     answer(%{success: false})
-
-    result = post(conn, ~p"/magic-links", %{"user" => %{"email" => user.email}})
-    assert redirected_to(result) == ~p"/session/new"
-    assert get_session(result, "inertia_errors")["turnstile_token"]
+    assert json_response(post(conn, ~p"/api/v1/auth/magic-links", %{email: user.email}), 422)
     assert_no_email_sent()
-
     accept("magic_link")
-    params = %{"user" => %{"email" => user.email, "turnstileToken" => "valid"}}
-    assert redirected_to(post(conn, ~p"/magic-links", params)) == ~p"/session/new"
+
+    assert json_response(
+             post(conn, ~p"/api/v1/auth/magic-links", %{email: user.email, turnstileToken: "valid"}),
+             200
+           )
+
     assert_email_sent()
-
     token = capture_token(&Accounts.deliver_login_instructions(user.email, &1))
-    result = post(conn, ~p"/session", %{"user" => %{"token" => token}})
-    assert get_session(result, :user_token)
+
+    assert json_response(post(conn, ~p"/api/v1/auth/magic-links/#{token}/session", %{}), 201)[
+             "data"
+           ]["token"]
   end
 
-  test "the page gets only the public key, and the CSP allows the widget", %{conn: conn} do
-    result = get(conn, ~p"/registration/new")
+  test "bootstrap sends only the public widget configuration", %{conn: conn} do
+    result = get(conn, ~p"/api/v1/bootstrap")
 
-    assert inertia_props(result).turnstile == %{required: true, siteKey: "public-site-key"}
-    refute html_response(result, 200) =~ "fixture-secret"
-    [csp] = get_resp_header(result, "content-security-policy")
-    assert csp =~ ~r/script-src [^;]*https:\/\/challenges\.cloudflare\.com/
-    assert csp =~ "frame-src 'self' https://challenges.cloudflare.com"
+    assert json_response(result, 200)["data"]["turnstile"] == %{
+             "required" => true,
+             "siteKey" => "public-site-key"
+           }
+
+    refute result.resp_body =~ "fixture-secret"
   end
 
-  test "protection off: no key, no Cloudflare in the CSP, forms work without a token", %{
-    conn: conn
-  } do
+  test "protection off needs no token", %{conn: conn} do
     put_flag(:turnstile, false)
-    result = get(conn, ~p"/session/new")
 
-    assert inertia_props(result).turnstile == %{required: false, siteKey: nil}
-    [csp] = get_resp_header(result, "content-security-policy")
-    refute csp =~ "challenges.cloudflare.com"
+    assert json_response(get(conn, ~p"/api/v1/bootstrap"), 200)["data"]["turnstile"] == %{
+             "required" => false,
+             "siteKey" => nil
+           }
 
-    email = unique_email()
-    assert redirected_to(sign_up(conn, email, nil)) == ~p"/session/new"
-    assert Accounts.get_user_by_email(email)
+    assert json_response(sign_up(conn, unique_email(), nil), 201)
   end
 end

@@ -8,6 +8,7 @@ defmodule StarterKitWeb.Router do
 
   import StarterKitWeb.UserAuth
   import Oban.Web.Router
+  import StarterKitWeb.Plugs.BearerAuth, only: [require_authenticated_api_user: 2]
 
   alias StarterKitWeb.Plugs
 
@@ -37,11 +38,15 @@ defmodule StarterKitWeb.Router do
 
   pipeline :api do
     plug :accepts, ["json"]
-    plug :fetch_session
-    plug :protect_from_forgery
+    plug :fetch_query_params
     plug Plugs.SnakeCaseParams
-    plug :fetch_current_scope_for_user
-    plug Plugs.Locale
+    plug Plugs.BearerAuth
+    plug Plugs.ApiLocale
+    plug Plugs.VerifyAuthorized
+  end
+
+  pipeline :api_authenticated do
+    plug :require_authenticated_api_user
   end
 
   # No session: error messages use the default locale (the reader is a machine).
@@ -112,19 +117,10 @@ defmodule StarterKitWeb.Router do
     get "/legal/:slug", LegalPageController, :show
   end
 
-  # Guest-only pages.
-  scope "/", StarterKitWeb do
-    pipe_through [:browser, :redirect_if_user_is_authenticated]
-
-    resources "/registration", RegistrationController, only: [:new, :create], singleton: true
-  end
-
   # Sign-in (also used to re-authenticate for sudo mode).
   scope "/", StarterKitWeb do
     pipe_through :browser
 
-    resources "/session", SessionController, only: [:new, :create, :delete], singleton: true
-    resources "/magic-links", MagicLinkController, only: [:create, :show], param: "token"
     resources "/invitations", InvitationController, only: [:show], param: "token"
     delete "/impersonation", ImpersonationController, :delete
 
@@ -137,15 +133,6 @@ defmodule StarterKitWeb.Router do
     pipe_through :one_click
 
     post "/email-subscriptions/:token/opt-out", EmailOptOutController, :create
-  end
-
-  # Google sign-in (Ueberauth). The provider calls back with GET: modelled as the
-  # `create` of a one-shot resource because the verb is imposed by OAuth.
-  scope "/auth", StarterKitWeb do
-    pipe_through :browser
-
-    get "/:provider", OAuthController, :new
-    get "/:provider/callback", OAuthController, :create
   end
 
   # Signed-in app.
@@ -240,7 +227,34 @@ defmodule StarterKitWeb.Router do
     resources "/stripe/events", StripeEventController, only: [:create]
   end
 
-  # JSON API (same-origin, session + CSRF). Envelope: { data, meta } / { error }.
+  scope "/api/v1", StarterKitWeb.Api.V1, as: :api_v1 do
+    pipe_through :api
+
+    get "/bootstrap", BootstrapController, :show
+    get "/locales/:locale", LocaleController, :show
+
+    scope "/auth", Auth, as: :auth do
+      post "/sessions", SessionController, :create
+      post "/magic-links", MagicLinkController, :create
+      post "/magic-links/:token/session", MagicLinkSessionController, :create
+      post "/registrations", RegistrationController, :create
+      post "/confirmations/:token", ConfirmationController, :create
+      post "/password-resets", PasswordResetController, :create
+      put "/password-resets/:token", PasswordResetController, :update
+      get "/google/start", GoogleStartController, :show
+      get "/google/callback", GoogleCallbackController, :create
+    end
+  end
+
+  scope "/api/v1/auth", StarterKitWeb.Api.V1.Auth, as: :api_v1_auth do
+    pipe_through [:api, :api_authenticated]
+
+    delete "/session", SessionController, :delete
+    post "/sudo", SudoController, :create
+    get "/current-user", CurrentUserController, :show
+  end
+
+  # JSON API with bearer authentication. Envelope: { data, meta } / { error }.
   scope "/api/v1", StarterKitWeb.Api.V1, as: :api_v1 do
     pipe_through :api
 
@@ -248,7 +262,7 @@ defmodule StarterKitWeb.Router do
   end
 
   scope "/api/v1", StarterKitWeb.Api.V1, as: :api_v1 do
-    pipe_through [:api, :require_api_user, Plugs.VerifyAuthorized]
+    pipe_through [:api, :api_authenticated]
 
     resources "/direct-uploads", DirectUploadController, only: [:create]
   end

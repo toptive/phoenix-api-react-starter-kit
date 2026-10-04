@@ -19,7 +19,7 @@ One Mix project and one `package.json` at the root. Frontend commands run from t
 - **Tenant isolation.** Every tenant row carries `organization_id`; every query on it runs with
   `org_id:` (the Repo raises otherwise). Every tenant schema has an isolation test.
 - **The serializer is the type contract.** Data sent to React goes through a typelizer
-  serializer; TypeScript types, route helpers and page props are GENERATED. Never a
+  serializer; TypeScript types and route helpers are GENERATED. Never a
   hand-written mirror type, never a hard-coded path.
 - **Gates are green before every commit and push.** Fix the code, never the gate.
 - **Servers are read-only for Claude.** Give Facundo the exact commands; never run them.
@@ -59,14 +59,16 @@ credo/, test/architecture/  our rules, executable
   resource controller: `POST /admin/users/:user_id/impersonation`, not `impersonate`.
   URLs are resource trees, never verbs. (`credo` check `StarterKit.Credo.RestActions`.)
 - **Skinny**: authorize → cast params → ONE context call → render (Inertia props through
-  serializers, or `render_data/3` / `render_error/4` under `/api/v1`).
+  serializers for unconverted areas; API data uses `render_data/3`, `render_collection/4`
+  or `render_error/4` under `/api/v1`).
 - **Authorization**: every action calls `authorize!(conn, action, resource)` or
   `skip_authorization(conn)` (public pages). `VerifyAuthorized` fails the request otherwise and
   `test/architecture` fails the build. Policies: one module per schema, deny by default.
 - Controllers never touch `Repo`, `Ecto.Query` or changesets (`boundary` + architecture test).
-- Pages: `render_inertia(conn, "settings/profile/edit", props)`; public, indexable pages use
-  `render_public/3` (SSR + SEO). Each page declares its props with `page/2` (typelizer).
-- Forms: validation errors via `assign_changeset_errors/2` + redirect (303 for Inertia).
+- Converted controllers live under `controllers/api/v1`, use opaque bearer tokens, and answer
+  JSON envelopes. Changeset failures are 422 `validation_failed` with field → message-key lists.
+- Unconverted areas keep their Inertia rendering, `page/2` declarations and 303 form redirects
+  until that area is converted. Do not add Inertia declarations to API controllers.
 
 ### Contexts (STRICT)
 
@@ -92,11 +94,12 @@ credo/, test/architecture/  our rules, executable
 
 ## Type contract
 
-Serializers (`lib/starter_kit_web/serializers`), the router and `page`/`shared` declarations →
-`mix typelizer.gen` → `assets/js/generated/{serializers,routes,pages}`. Generated files are
-committed; `mix typelizer.check` fails on drift (pre-commit, pre-push, `/deploy`).
-Use `routes.settingsProfile.edit().url`, `import type { SettingsProfileEditProps } from "@/generated/pages"`,
-and `useSharedProps()` for shared props. Details: [docs/TYPE_CONTRACT.md](docs/TYPE_CONTRACT.md).
+Serializers (`lib/starter_kit_web/serializers`) and the router → `mix typelizer.gen` →
+`frontend/src/api/generated/{serializers,routes}`. Generated files are committed;
+`mix typelizer.check` fails on drift (pre-commit, pre-push, `/deploy`).
+Use generated serializer types and route helpers in the SPA; never mirror a server type or
+hard-code a path. The pages generator is disabled. Unconverted Inertia controllers retain
+runtime prop validation until their conversion. Details: [docs/TYPE_CONTRACT.md](docs/TYPE_CONTRACT.md).
 
 ## Frontend
 

@@ -33,21 +33,18 @@ Check it: `mix boundary.spec` prints the graph.
 - Shape of an action:
 
   ```elixir
-  def update(conn, %{"organization" => params}) do
-    organization = scope(conn).organization
-    conn = authorize!(conn, :update, organization)
-
-    case Organizations.update_organization(scope(conn), organization, params) do
-      {:ok, _} -> conn |> put_flash_t(:info, "flash.organization.updated") |> redirect(to: ~p"/settings/organization/edit")
-      {:error, changeset} -> conn |> assign_changeset_errors(changeset) |> redirect(to: ~p"/settings/organization/edit")
-    end
+  def show(conn, _params) do
+    conn = authorize!(conn, :show, scope(conn).user)
+    render_data(conn, {Serializers.UserSerializer, scope(conn).user})
   end
   ```
 
-- `StarterKitWeb.ErrorPages` wraps every action: a denied policy renders the Inertia page
-  `errors/show` with 403, a missing record with 404 (the JSON envelope under `/api`).
-- The only exception to "GET has no side effects" is the email-change confirmation link and the
-  OAuth callback, both imposed by email/OAuth; both are documented in their controllers.
+- Converted controllers live in `controllers/api/v1`; they do not declare Inertia pages.
+  Unconverted areas retain their existing controllers and rendering until conversion.
+- `StarterKitWeb.ErrorPages` wraps actions: policy denial → 403 `forbidden`, missing record →
+  404 `not_found`, both in the API envelope. Unconverted browser pages keep `errors/show`.
+- OAuth's imposed GET callback is modelled as `create` on its own resource controller.
+  Magic links and email confirmation tokens are spent only by POST.
 
 ## 3. Authorization (the Pundit equivalent)
 
@@ -96,17 +93,47 @@ Concurrency stays below the DB pool (`POOL_SIZE` 8, jobs 5 + 2). Oban Web at `/a
 
 ## 7. Responses and the wire
 
-- Inertia pages: `render_inertia/3` (app) or `render_public/3` (SSR + `indexable`).
-- Props and JSON keys are camelCase (`camelize_props: true` + serializers). Incoming params are
-  converted to snake_case (`Plugs.SnakeCaseParams`); form errors come back camelized, matching
-  the camelCase form fields. Data maps whose keys must survive (the i18n catalogue) use
-  `preserve_case/1`.
-- `/api/v1`: `render_data/3` → `{data, meta}`, `render_error/4` → `{error: {code, message, details}}`.
-  Raw `json/2` exists only in `StarterKitWeb.Responses` (architecture test).
+- `/api/v1`: `Responses.render_data/3` takes serialized data or `{serializer, value}` plus
+  a metadata map, always returning `{data, meta}`. Set status on the conn before rendering.
+  `render_collection/4` serializes a list and includes pagination metadata.
+- `render_error/4` returns `{error: {code, message, details}}`. Codes are stable English;
+  messages use the request locale. `render_validation_error/2` returns 422 `validation_failed`
+  with field → lists of message keys. Details and identifier keys are camelCase; dotted
+  translation keys and locale identifiers retain their spelling.
+- Only `render_data`, `render_collection` and `render_error` may call `json/2`; architecture
+  tests enforce this. `ErrorJSON` reuses the envelope builder for unmatched routes and errors.
+  `ErrorResponses` marks API requests as JSON and all errors as private, no-store and noindex.
+- Unconverted Inertia areas retain `render_inertia/3`, `render_public/3`, translated form errors
+  and runtime `page/2` prop validation. The dependency stays until the final conversion.
 
-## 8. Request pipeline (browser)
+## 8. API request pipeline
 
-`SnakeCaseParams → secure headers + CSP nonce → current scope (user, organization,
-impersonator) → locale → Inertia → typelizer ValidateProps (dev/test) → shared props`.
-Authenticated scopes add `require_authenticated_user` + `VerifyAuthorized`; the admin scope adds
-`require_superadmin` (404 for everyone else).
+The endpoint assigns a request id and resolves client IP before JSON parsing. Only configured
+proxy hops may supply forwarding headers. API CORS uses `cors_origins` (`CORS_ORIGINS`, default
+`SPA_ORIGIN`), including OPTIONS preflights; no credential cookies are enabled.
+
+The `:api` pipeline accepts JSON, fetches query parameters, converts incoming keys with
+`SnakeCaseParams`, loads `BearerAuth`, negotiates `ApiLocale`, and installs `VerifyAuthorized`.
+There is no session fetch or CSRF check. Locale order: `?locale=` → quality-ranked
+`Accept-Language` → authenticated user's preference → CSV default. Cookies are not consulted.
+
+`require_authenticated_api_user` returns 401; `BearerAuth.require_sudo` returns 401
+`sudo_required`; `BearerAuth.require_superadmin` returns 404 for anonymous, ordinary or
+impersonating callers. Contexts receive the resolved `%Scope{}` for tenant queries.
+
+`GET /api/v1/bootstrap` is public and returns nullable user/organization/membership,
+organizations, impersonator, superadmin, locale/locales/i18nVersion, public flags, app and
+Turnstile configuration. Personalized bootstrap responses are private, no-store.
+`GET /api/v1/locales/:locale` returns a flat map in `data`; its ETag combines locale and i18n
+version, and matching `If-None-Match` returns 304. Unknown locales return 404.
+
+Serializers and router helpers generate to `frontend/src/api/generated/{serializers,routes}`.
+The pages generator is disabled. Existing `assets/js/generated` files remain as the unconverted
+frontend's snapshot; new API controllers never use `Typelizer.InertiaPage`.
+
+## 9. Browser pipeline during conversion
+
+Unconverted areas retain `SnakeCaseParams → secure headers + CSP nonce → cookie scope →
+locale → Inertia → ValidateProps → shared props`. Signed-in and superadmin checks stay in place.
+Their sign-in redirects point to the SPA. Browser sessions are a temporary compatibility layer;
+the new API never accepts them.

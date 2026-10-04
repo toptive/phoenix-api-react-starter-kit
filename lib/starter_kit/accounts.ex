@@ -20,7 +20,7 @@ defmodule StarterKit.Accounts do
 
   import Ecto.Query, warn: false
 
-  alias StarterKit.Accounts.{Impersonation, Scope, User, UserPolicy, UserToken}
+  alias StarterKit.Accounts.{GoogleIdentity, Impersonation, Scope, User, UserPolicy, UserToken}
   alias StarterKit.{Audit, Legal, Notifications, Repo}
 
   ## Getters
@@ -207,6 +207,10 @@ defmodule StarterKit.Accounts do
         {:error, :not_found}
     end
   end
+
+  @doc "Exchanges a Google authorization code for a verified identity."
+  def google_identity(code, redirect_uri, locale),
+    do: GoogleIdentity.exchange(code, redirect_uri, locale)
 
   ## Google sign-in
 
@@ -407,6 +411,164 @@ defmodule StarterKit.Accounts do
       with {:ok, user} <- Repo.update(changeset) do
         Audit.record(action, scope: scope, subject: user)
         {:ok, user}
+      end
+    end)
+  end
+
+  ## Bearer authentication
+
+  @doc "Creates a hashed, opaque API token, valid for fourteen days."
+  def generate_api_token(user, device \\ %{}, opts \\ []) do
+    raw = :crypto.strong_rand_bytes(32)
+    timestamp = now()
+
+    row =
+      Repo.insert!(%UserToken{
+        user_id: user.id,
+        token: :crypto.hash(:sha256, raw),
+        context: "api",
+        expires_at: DateTime.add(timestamp, 14, :day),
+        authenticated_at: timestamp,
+        sudo_until: DateTime.add(timestamp, 10, :minute),
+        impersonator_id: opts[:impersonator_id],
+        user_agent: device[:user_agent] && String.slice(device[:user_agent], 0, 255),
+        ip_address: device[:ip_address]
+      })
+
+    %{token: Base.url_encode64(raw, padding: false), expires_at: row.expires_at, user: user}
+  end
+
+  @doc "Loads the user and token row; malformed, expired or revoked tokens return nil."
+  def get_user_by_api_token(encoded) when is_binary(encoded) do
+    with {:ok, raw} <- Base.url_decode64(encoded, padding: false),
+         true <- byte_size(raw) == 32 do
+      hash = :crypto.hash(:sha256, raw)
+
+      Repo.one(
+        from t in UserToken,
+          join: u in assoc(t, :user),
+          where: t.context == "api" and t.token == ^hash and t.expires_at > ^now(),
+          preload: [:impersonator],
+          select: {u, t}
+      )
+    else
+      _ -> nil
+    end
+  end
+
+  @doc "Revokes the current API token."
+  def delete_api_token(%Scope{user: user}, %UserToken{} = token) do
+    Repo.delete_all(
+      from t in UserToken,
+        where: t.id == ^token.id and t.user_id == ^user.id and t.context == "api"
+    )
+
+    :ok
+  end
+
+  @doc "Password sign-in and bearer token issuance."
+  def create_api_session(attrs, device) do
+    attrs = Map.take(attrs, ["email", "password"])
+    attrs = Map.new(attrs, fn {key, value} -> {key, if(is_binary(value), do: value, else: "")} end)
+
+    case get_user_by_email_and_password(attrs["email"] || "", attrs["password"] || "") do
+      %User{confirmed_at: confirmed} = user when not is_nil(confirmed) ->
+        {:ok, generate_api_token(user, device)}
+
+      _ ->
+        {:error, :invalid_credentials}
+    end
+  end
+
+  @doc "Consumes a magic link atomically and issues a bearer token."
+  def create_magic_link_session(token, device) do
+    Repo.transact(fn ->
+      with {:ok, query} <- UserToken.verify_magic_link_token_query(token),
+           {_user, _row} <- Repo.one(lock(query, "FOR UPDATE")),
+           {:ok, {user, expired}} <- login_user_by_magic_link(token) do
+        {:ok, Map.put(generate_api_token(user, device), :new_account, expired != [])}
+      else
+        _ -> {:error, :invalid_token}
+      end
+    end)
+  end
+
+  @doc "Confirms an email without signing in or exposing a bearer token."
+  def confirm_api_email(token) do
+    Repo.transact(fn ->
+      with {:ok, query} <- UserToken.verify_magic_link_token_query(token),
+           {user, row} <- Repo.one(lock(query, "FOR UPDATE")),
+           {:ok, user} <- Repo.update(User.confirm_changeset(user)),
+           {:ok, _} <- Repo.delete(row) do
+        {:ok, user}
+      else
+        _ -> {:error, :invalid_token}
+      end
+    end)
+  end
+
+  @doc "Refreshes sudo mode for this token only after verifying the user's password."
+  def elevate_api_token(%Scope{user: user, impersonator: nil}, token, attrs) do
+    if token.user_id == user.id and token.context == "api" and
+         User.valid_password?(user, attrs["password"] || "") do
+      persist_api_sudo(user, token)
+    else
+      {:error, :invalid_credentials}
+    end
+  end
+
+  def elevate_api_token(_scope, _token, _attrs), do: {:error, :forbidden}
+
+  defp persist_api_sudo(user, token) do
+    Repo.transact(fn ->
+      with {:ok, token} <-
+             token
+             |> Ecto.Changeset.change(sudo_until: DateTime.add(now(), 10, :minute))
+             |> Repo.update(),
+           {:ok, _event} <- Audit.record("user.sudo_authenticated", actor: user, subject: user) do
+        {:ok, token}
+      end
+    end)
+  end
+
+  @doc "Emails a reset link; never reveals whether the email belongs to an account."
+  def deliver_password_reset(email, url_fun) do
+    with :ok <- require_email_delivery() do
+      if user = get_user_by_email(email) do
+        {encoded, row} = UserToken.build_email_token(user, "reset_password")
+        Repo.insert!(row)
+        Notifications.notify(user, :password_reset, %{url: url_fun.(encoded)})
+      end
+
+      :ok
+    end
+  end
+
+  @doc "Sets a password with a single-use, fifteen-minute reset token; revokes all tokens."
+  def reset_api_password(encoded, attrs) do
+    Repo.transact(fn ->
+      with {:ok, raw} <- Base.url_decode64(encoded, padding: false),
+           hash = :crypto.hash(:sha256, raw),
+           {user, _row} <-
+             Repo.one(
+               from t in UserToken,
+                 join: u in assoc(t, :user),
+                 where:
+                   t.context == "reset_password" and t.token == ^hash and
+                     t.sent_to == u.email and t.inserted_at > ago(15, "minute"),
+                 lock: "FOR UPDATE",
+                 select: {u, t}
+             ),
+           changeset =
+             user
+             |> User.password_changeset(attrs)
+             |> Ecto.Changeset.put_change(:confirmed_at, user.confirmed_at || now()),
+           {:ok, {user, _expired}} <- update_user_and_delete_all_tokens(changeset),
+           {:ok, _event} <- Audit.record("user.password_reset", actor: user, subject: user) do
+        {:ok, user}
+      else
+        {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
+        _ -> {:error, :invalid_token}
       end
     end)
   end

@@ -13,7 +13,7 @@ defmodule StarterKitWeb.Api.V1.DirectUploadController do
 
     case Uploads.presign(Scope.organization_id(scope(conn)), params) do
       {:ok, upload} ->
-        render_data(conn, Serializers.DirectUploadSerializer.serialize(upload), status: 201)
+        conn |> put_status(201) |> render_data({Serializers.DirectUploadSerializer, upload})
 
       {:error, reason}
       when reason in [:content_type_not_allowed, :too_large, :invalid_size, :unknown_kind] ->

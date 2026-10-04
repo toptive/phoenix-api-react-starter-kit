@@ -424,6 +424,14 @@ defmodule StarterKit.Organizations do
     Accounts.register_user(attrs, url_fun, Keyword.put(opts, :invited, invited))
   end
 
+  @doc "Exchanges the provider code, applies signup policy and issues an API session."
+  def create_google_api_session(code, redirect_uri, locale, device) do
+    with {:ok, info} <- Accounts.google_identity(code, redirect_uri, locale),
+         {:ok, user} <- upsert_google_user(info) do
+      {:ok, Accounts.generate_api_token(user, device)}
+    end
+  end
+
   @doc "Google sign-in (`StarterKit.Accounts.upsert_google_user/2`), invitation-aware like `register_user/3`."
   def upsert_google_user(info) do
     Accounts.upsert_google_user(info, invited: invited_email?(info[:email]))

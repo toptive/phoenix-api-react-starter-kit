@@ -1,13 +1,15 @@
 defmodule StarterKitWeb.ApiTest do
   use StarterKitWeb.ConnCase, async: true
 
-  test "direct uploads need a session and answer in the envelope", %{conn: conn} do
+  test "direct uploads need a bearer token and answer in the envelope", %{conn: conn} do
     conn = put_req_header(conn, "accept", "application/json")
 
     assert %{"error" => %{"code" => "unauthorized"}} =
              conn |> post(~p"/api/v1/direct-uploads", %{}) |> json_response(401)
 
-    %{conn: conn} = register_and_log_in_user(%{conn: conn})
+    user = user_fixture()
+    session = StarterKit.Accounts.generate_api_token(user)
+    conn = put_req_header(conn, "authorization", "Bearer " <> session.token)
 
     body = %{
       "direct_upload" => %{

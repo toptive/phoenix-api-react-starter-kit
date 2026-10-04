@@ -109,7 +109,7 @@ defmodule StarterKitWeb.AppTest do
     stale = %{user | authenticated_at: DateTime.add(DateTime.utc_now(:second), -3600)}
     token = StarterKit.Accounts.generate_user_session_token(stale)
     conn = conn |> put_session(:user_token, token) |> get(~p"/settings/password/edit")
-    assert redirected_to(conn) == ~p"/session/new"
+    assert redirected_to(conn) == "http://localhost:5173/auth/session"
   end
 
   test "sessions page marks this device and can end another", %{conn: conn, user: user} do

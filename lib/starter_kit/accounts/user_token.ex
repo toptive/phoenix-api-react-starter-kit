@@ -22,6 +22,9 @@ defmodule StarterKit.Accounts.UserToken do
     field :context, :string
     field :sent_to, :string
     field :authenticated_at, :utc_datetime
+    field :expires_at, :utc_datetime
+    field :sudo_until, :utc_datetime
+    belongs_to :impersonator, StarterKit.Accounts.User
     field :user_agent, :string
     field :ip_address, :string
     belongs_to :user, StarterKit.Accounts.User

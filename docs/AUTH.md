@@ -1,34 +1,63 @@
 # Authentication
 
-Session auth in the `phx.gen.auth` 1.8 style, extended with organizations and impersonation.
-Context: `StarterKit.Accounts`. Web: `StarterKitWeb.UserAuth`.
+The auth area is a JSON API under `/api/v1/auth`, consumed by the SPA. Context:
+`StarterKit.Accounts`. Authentication: `StarterKitWeb.Plugs.BearerAuth`. Unconverted browser
+areas still use `StarterKitWeb.UserAuth` and cookie sessions until their area is converted.
 
 ## Sign up and sign in
 
-- **Sign up** (`/registration/new`): name + email + one checkbox (terms and privacy). The user
-  gets a magic link; opening it confirms the email and signs in. No password at sign-up (fewer
-  steps for non-technical users). Who may sign up: [Sign-up modes](#sign-up-modes).
-- **Consent** is written in the same transaction as the user (`Accounts.register_user/3`): one
-  `LegalAcceptance` per published version of `terms` and `privacy` (IP kept), plus the
-  `user.registered` audit event with the accepted slugs. No account without its consent; the
-  link leaves after the commit. An unpublished document is skipped. Google sign-up has no
-  checkbox, so it records no acceptance.
-- **Magic link** (`/session/new`, "Email me a link"): single use, 15 minutes. The link opens a page
-  with one button (`POST /session` with the token), so email scanners cannot consume it. The
-  response never reveals whether an email has an account.
-- **No mail, no "check your inbox"**: when no mail can leave (`Notifications.email_available?/0`
-  is false: production without `POSTMARK_API_KEY`), sign-up, sign-in links and email changes
-  refuse before any write and say so (`flash.email_unavailable`). The sign-up and sign-in pages
-  get `emailAvailable` (`Accounts.email_sign_in_available?/0`) and say it up front: no sign-up
-  form, no link form and no stale "check your email"; password sign-in still works.
-- **Password** (optional, Settings → Password): at least 12 characters. A password change ends
-  every other session.
-- **Google** (optional): set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. The button appears on
-  the sign-in page. An existing account with the same email is linked.
-- **Email change**: the link in the "confirm your new email" message opens a page with one button
-  (`GET /settings/email-confirmations/:token`); only the button's `POST` changes the email. The
-  token is single-use and needs the user's session, so a link scanner can never use it.
-- Remember-me cookie (14 days) is on by default; session tokens are reissued every 7 days.
+Requests use flat camelCase fields (`email`, `password`, `passwordConfirmation`,
+`termsAccepted`, `turnstileToken`). Responses use `{data, meta}` or
+`{error: {code, message, details}}`; validation failures are 422 `validation_failed`, with
+field names mapped to lists of i18n message keys.
+
+| Method | Resource | Behavior |
+|---|---|---|
+| POST | `/api/v1/auth/sessions` | Email/password → 201 `{token, expiresAt, user}` |
+| DELETE | `/api/v1/auth/session` | Revokes only the current bearer token; requires authentication |
+| POST | `/api/v1/auth/registrations` | Name/email/terms; sends an SPA magic link; no bearer issued |
+| POST | `/api/v1/auth/magic-links` | Emails a link; identical response for known and unknown emails |
+| POST | `/api/v1/auth/magic-links/:token/session` | Consumes a single-use link → 201 session payload |
+| POST | `/api/v1/auth/confirmations/:token` | Confirms email and consumes the link; no bearer issued |
+| POST | `/api/v1/auth/password-resets` | Private reset request; identical response for unknown emails |
+| PUT | `/api/v1/auth/password-resets/:token` | Sets password; revokes all tokens; single-use, fifteen-minute link |
+| POST | `/api/v1/auth/sudo` | Checks the current user's password; returns `{sudoUntil}` |
+| GET | `/api/v1/auth/current-user` | Requires a bearer and authorizes access to the user |
+| GET | `/api/v1/auth/google/start` | 302 to Google with signed, browser-bound state |
+| GET | `/api/v1/auth/google/callback` | 302 to `SPA_ORIGIN/auth/callback#token=…` or `#error=…` |
+
+The sign-up user, legal consent and `user.registered` audit event are written in one
+transaction. Consent covers the published terms/privacy versions and the resolved client IP.
+Google sign-up has no checkbox, so it does not record legal acceptance. Google must verify
+the email before linking or creating an account; signup modes apply to new accounts.
+Configure Google's redirect URI as the API origin plus `/api/v1/auth/google/callback`.
+
+`spa_origin` (`SPA_ORIGIN`, default `http://localhost:5173`) builds emailed auth links and OAuth
+redirects. Magic links open `/auth/magic-links/:token` in the SPA, where the user's button
+POSTs the token. GET never consumes a magic link. Reset links open `/auth/password-resets/:token`.
+Emails still render in the recipient's preferred locale. Passwords are at least twelve characters.
+
+Without a delivery adapter, registration, magic-link requests and reset requests refuse with
+503 `email_unavailable` before writing. Password sign-in still works. Bootstrap exposes
+`app.emailAvailable`, `app.googleEnabled` and `app.signupMode` so the SPA can explain availability.
+
+## Bearer tokens
+
+Send `Authorization: Bearer <token>` on API requests. The random 32-byte token is URL-safe
+base64; only its SHA-256 hash is stored in `users_tokens` under context `api`. The row carries
+`expires_at` (fourteen days), `sudo_until` (ten minutes), device/IP and `impersonator_id`.
+The bearer plug loads the user and row, then resolves the current organization through
+membership and `last_organization_id`. It assigns `current_user`, `current_scope`, `api_token`.
+Cookies never authenticate an API request. Missing, malformed, expired or revoked tokens are
+anonymous; protected resources return 401 `unauthorized`. Tokens are not automatically rotated.
+Sign-out revokes the current token; password reset revokes every token and confirms the email.
+Password reset and sudo reauthentication record `user.password_reset` and
+`user.sudo_authenticated`, respectively, in the same transaction as the change.
+
+Google state is signed, valid for ten minutes, and bound to a transient HttpOnly SameSite=Lax
+cookie. This is an OAuth flow cookie, not an authentication session. Tokens return in the SPA
+fragment so they never enter the SPA server's request URL. Callback responses are private and
+send `Referrer-Policy: no-referrer`. Both Google credentials must be configured.
 
 ## Sign-up modes
 
@@ -43,10 +72,10 @@ Context: `StarterKit.Accounts`. Web: `StarterKitWeb.UserAuth`.
 Existing users sign in in every mode, Google included. Production starts at `invite` in
 `config/deploy.yml` (like `SITE_INDEXING`); set `open` on launch day. The first superadmin comes
 from the bootstrap task ([ADMIN.md](ADMIN.md#first-superadmin)), not from sign-up.
-## Sessions
+## Devices during conversion
 
-Each session token stores the device (user agent, IP). Settings → Devices lists them; the user
-signs out any device.
+API tokens record user agent and resolved client IP. The unconverted Settings → Devices
+controller still lists cookie sessions; it will adopt API token rows when that area is converted.
 
 ## Account deletion
 
@@ -67,8 +96,11 @@ organization uses `on_delete: :restrict` and handles the orphan in `Privacy`.
 
 ## Sudo mode
 
-Email, password and account deletion need a sign-in within the last 10 minutes
-(`require_sudo_mode`); otherwise the user is asked to sign in again and comes back.
+API sensitive resources use `BearerAuth.require_sudo/2`, returning 401 `sudo_required`
+when the current token's ten-minute window has expired. `POST /api/v1/auth/sudo` verifies a
+password and extends this token only. A passwordless user can sign in again with a magic link
+to receive a fresh token with a sudo window. Impersonated tokens cannot enter sudo mode.
+Unconverted browser settings keep `UserAuth.require_sudo_mode/2` and redirect to SPA sign-in.
 
 ## Roles
 
@@ -85,54 +117,25 @@ cannot be impersonated.
 
 ## Rate limits (per IP, `Plugs.RateLimit`, ETS)
 
-| Endpoint | Limit |
+| API resource | Limit |
 |---|---|
-| `POST /session` | 10 / minute |
-| `POST /registration` | 10 / minute |
-| `POST /magic-links` | 5 / minute |
-| `POST /settings/invitations` | 30 / hour |
-| `POST /api/v1/direct-uploads` | 60 / minute |
-| `POST /api/v1/events` | 120 / minute |
-| `POST /email-subscriptions/:token/opt-out` | 120 / minute (429 JSON: no session) |
+| Password sessions, registrations, magic-link sessions, confirmations | 10 / minute each |
+| Magic-link requests, password resets | 5 / minute each |
+| Sudo, Google start, Google callback | 10 / minute each |
+| Direct uploads | 60 / minute |
+| Analytics events | 120 / minute |
 
-Over the limit: a translated flash + redirect back (pages), or 429 in the JSON envelope.
+Anonymous endpoints that create work are limited. Exceeded limits return 429 `rate_limited`
+and a `Retry-After` header. Error responses are private, no-store and noindex.
 
 ## Bot protection (Turnstile)
 
-Cloudflare Turnstile guards the anonymous forms that create work: sign-up
-(`POST /registration`) and "email me a link" (`POST /magic-links`). It is OFF by default
-(flag `:turnstile`, env `TURNSTILE_REQUIRED`). The emailed sign-in link stays one click.
-
-- **Server**: `StarterKit.AbuseProtection.verify/3` asks Cloudflare's siteverify and checks
-  `success`, our hostname (`TURNSTILE_HOSTNAME`, else `PHX_HOST`) and the action. One try,
-  5 s, no retry. Anything else refuses: no token, a used token, a timeout, a missing secret.
-- **Plug**: `plug StarterKitWeb.Plugs.VerifyTurnstile, "registration" when action == :create`.
-  A refusal goes back to the form with a translated error on `turnstileToken`; the action
-  never runs.
-- **Page**: `components/app/turnstile.tsx` with the same action. It reads the `turnstile`
-  shared prop (`required`, the public site key; never the secret) and renders nothing when
-  OFF. A token works once: bump `attempt` after every submit. Every form behind the plug
-  must render the widget; `assets/js/components/app/turnstile-forms.test.tsx` checks the two forms.
-- **CSP**: `challenges.cloudflare.com` joins `script-src`, `connect-src` and `frame-src`
-  only while the flag is ON.
-- **New action**: add it to `AbuseProtection.actions/0`, the plug's `form_path/1`, the
-  `TurnstileAction` type, and the page test.
-
-Turn it on:
-
-1. Cloudflare dashboard → Turnstile → add a widget for the product's hostname (mode
-   "Managed"). Store the keys: `cred add starter_kit/TURNSTILE_SITE_KEY`,
-   `cred add starter_kit/TURNSTILE_SECRET_KEY`.
-2. Uncomment the two `TURNSTILE_*` lines in `.kamal/secrets` and set `turnstile = true` at
-   the top of `config/deploy.yml`.
-3. Deploy. In production a missing key or a Cloudflare test key (`1x000…`, `2x000…`,
-   `3x000…`) stops the boot.
-
-Dev: `TURNSTILE_REQUIRED=true TURNSTILE_SITE_KEY=1x00000000000000000000AA
-TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA mix phx.server` (Cloudflare's
-always-pass test keys; their answer counts only while the secret is a test secret). Use
-`2x00000000000000000000AB` as the site key to see a blocked visitor. Automated browsers
-fail real challenges: tests answer for Cloudflare with `Req.Test` (`put_flag(:turnstile, true)`).
+Turnstile guards API registration and magic-link requests. It is OFF by default (`turnstile`
+flag, `TURNSTILE_REQUIRED`). The flat `turnstileToken` must pass the expected action and
+hostname; failure returns 422 `validation_failed`, with
+`details.turnstileToken: ["validation.turnstile_required"]`, before any action runs.
+Bootstrap exposes only `turnstile.required` and the public `siteKey`. Emailed link consumption
+needs no new challenge. See [SECURITY.md](SECURITY.md) for provider and proxy setup.
 
 The client IP comes from `StarterKitWeb.Plugs.ClientIp`. `X-Forwarded-For` counts only when the
 socket peer is in `TRUSTED_PROXY_CIDRS` (kamal-proxy's Docker network), and `CF-Connecting-IP`

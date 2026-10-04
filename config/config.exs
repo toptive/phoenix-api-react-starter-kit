@@ -18,7 +18,9 @@ config :starter_kit,
   signup_mode: :open,
   ssr: false,
   ssr_pool_size: 1,
-  google_auth: false
+  google_auth: false,
+  spa_origin: "http://localhost:5173",
+  cors_origins: ["http://localhost:5173"]
 
 # Used by `mix phx.gen.*` generators (--scope) — products get scoped contexts for free.
 config :starter_kit, :scopes,
@@ -135,9 +137,9 @@ config :typelizer,
   repo: StarterKit.Repo,
   router: StarterKitWeb.Router,
   output: [
-    serializers: "assets/js/generated/serializers",
-    routes: "assets/js/generated/routes",
-    pages: "assets/js/generated/pages"
+    serializers: "frontend/src/api/generated/serializers",
+    routes: "frontend/src/api/generated/routes",
+    pages: nil
   ],
   # Oban Web: keep its entry page, skip its asset routes.
   routes: [exclude: ["/dev", "/live", ~r{^/admin/oban/}E], defaults: [:locale]]

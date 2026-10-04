@@ -9,7 +9,9 @@ defmodule StarterKitWeb.CsrfTest do
     do: update_in(conn.private, &Map.delete(&1, :plug_skip_csrf_protection))
 
   test "an Inertia form post with X-XSRF-TOKEN passes CSRF", %{conn: conn} do
-    page = conn |> with_csrf_checks() |> get(~p"/registration/new")
+    page =
+      conn |> with_csrf_checks() |> log_in_user(user_fixture()) |> get(~p"/settings/profile/edit")
+
     token = page.resp_cookies["XSRF-TOKEN"].value
 
     conn =
@@ -18,16 +20,17 @@ defmodule StarterKitWeb.CsrfTest do
       |> with_csrf_checks()
       |> inertia()
       |> put_req_header("x-xsrf-token", token)
-      |> post(~p"/registration", %{"user" => %{"name" => "Ana", "email" => unique_email()}})
+      |> put(~p"/settings/profile", %{"user" => %{"name" => "Ana"}})
 
     assert conn.status in [302, 303]
   end
 
   test "a post without a token is rejected", %{conn: conn} do
-    page = conn |> with_csrf_checks() |> get(~p"/registration/new")
+    page =
+      conn |> with_csrf_checks() |> log_in_user(user_fixture()) |> get(~p"/settings/profile/edit")
 
     assert_raise Plug.CSRFProtection.InvalidCSRFTokenError, fn ->
-      page |> recycle() |> with_csrf_checks() |> post(~p"/registration", %{"user" => %{}})
+      page |> recycle() |> with_csrf_checks() |> put(~p"/settings/profile", %{"user" => %{}})
     end
   end
 end

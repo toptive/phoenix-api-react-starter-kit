@@ -61,6 +61,8 @@ defmodule StarterKitWeb.Endpoint do
   # only from TRUSTED_PROXY_CIDRS (kamal-proxy) and, through it, from Cloudflare.
   plug StarterKitWeb.Plugs.ClientIp
 
+  plug StarterKitWeb.Plugs.Cors
+
   plug Plug.Parsers,
     parsers: [:urlencoded, :multipart, :json],
     pass: ["*/*"],
