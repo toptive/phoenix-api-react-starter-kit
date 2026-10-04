@@ -25,6 +25,7 @@ test("invite a second user, accept, change role, remove, rejoin and leave; last 
       .selectOption("admin")
     await row.getByRole("button", { name: text("common.save"), exact: true }).click()
     await expect(row.getByRole("button", { name: text("common.save"), exact: true })).toBeDisabled()
+    await expect(row.getByText(text("level.admin_full"), { exact: true }).first()).toBeVisible()
     const members = await api.call<Membership[]>(routes.apiV1SettingsMembers.index(), undefined, user.token)
     expect(members.find((member) => member.user?.email === second.user.email)?.role).toBe("admin")
     await row.getByRole("button", { name: text("settings.members.remove"), exact: true }).click()

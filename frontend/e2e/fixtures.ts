@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
-import { execFileSync } from "node:child_process"
+import { seedUser } from "./backend"
+export { expireSudo, sendOptionalEmail } from "./backend"
 import { test as base, expect, type APIRequestContext, type Page } from "@playwright/test"
 import * as routes from "../src/api/generated/routes"
 import type { RouteDefinition, Method } from "../src/api/generated/routes"
@@ -15,7 +16,7 @@ export const text = (key: keyof typeof en, bindings: Record<string, string | num
   )
 export const uniqueEmail = () => `e2e-${randomUUID()}@example.com`
 export const password = "Browser-test-password-2026"
-export type TestUser = AuthSession & { token: string; magicPath: string; workspace: string }
+export type TestUser = AuthSession & { token: string; workspace: string }
 
 export class TestApi {
   constructor(readonly context: APIRequestContext) {}
@@ -46,8 +47,7 @@ export class TestApi {
           const response = await this.context.get(process.env.E2E_MAILBOX_PATH ?? "/dev/mailbox/json")
           expect(response.ok(), "The API must expose the local test mailbox").toBeTruthy()
           const mailbox = (await response.json()) as { data: { to: string[]; text_body: string; html_body: string }[] }
-          for (const mail of mailbox.data) {
-            if (!mail.to.some((recipient) => recipient.includes(email))) continue
+          for (const mail of mailbox.data.filter((mail) => mail.to.some((recipient) => recipient.includes(email)))) {
             const links = `${mail.text_body}\n${mail.html_body}`.match(/https?:\/\/[^\s"<>]+/g) ?? []
             for (const link of links) {
               const candidate = new URL(link.replaceAll("&amp;", "&")).pathname
@@ -66,15 +66,14 @@ export class TestApi {
   }
   async createUser(options: { withPassword?: boolean; onboard?: boolean } = {}): Promise<TestUser> {
     const email = uniqueEmail()
-    await this.call(routes.apiV1AuthRegistrations.create(), {
-      name: "Browser Tester",
-      email,
-      termsAccepted: true,
-      locale: "en",
-    })
-    const magicPath = await this.mailLink(email, "/magic-links/")
-    const token = magicPath.split("/").at(-1)!
-    let session = await this.call<AuthSession>(routes.apiV1AuthMagicLinksSessions.create(token), {})
+    const seeded = seedUser(email)
+    const auth = (await this.bootstrap(seeded.token)).auth!
+    let session: AuthSession = {
+      ...seeded,
+      user: auth.user,
+      impersonator: auth.impersonator,
+      newAccount: false,
+    }
     expect(session.token).toBeTruthy()
     if (options.withPassword) {
       session = await this.call<AuthSession>(
@@ -85,14 +84,14 @@ export class TestApi {
     }
     const workspace = `Workspace ${randomUUID().slice(0, 8)}`
     if (options.onboard !== false) await this.call(routes.apiV1Onboarding.update(), { name: workspace }, session.token!)
-    return { ...session, token: session.token!, magicPath, workspace }
+    return { ...session, token: session.token!, workspace }
   }
   bootstrap(token: string) {
     return this.call<Bootstrap>(routes.apiV1Bootstrap.show(), undefined, token)
   }
 }
 
-type Fixtures = { catalogues: void; api: TestApi; createUser: TestApi["createUser"]; user: TestUser }
+type Fixtures = { catalogues: void; api: TestApi; createUser: TestApi["createUser"]; user: TestUser; admin: TestUser }
 export const test = base.extend<Fixtures>({
   catalogues: [
     async ({ api }, use) => {
@@ -109,6 +108,18 @@ export const test = base.extend<Fixtures>({
   },
   createUser: async ({ api }, use) => {
     await use(api.createUser.bind(api))
+  },
+  admin: async ({ api }, use) => {
+    const session = seedUser("e2e-superadmin@example.com", true)
+    const auth = (await api.bootstrap(session.token)).auth!
+    expect(auth.superadmin).toBe(true)
+    await use({
+      ...session,
+      user: auth.user,
+      impersonator: null,
+      newAccount: false,
+      workspace: auth.organization.name,
+    })
   },
   user: async ({ createUser }, use) => {
     await use(await createUser())
@@ -148,87 +159,4 @@ export async function accept(page: Page, path: string) {
   await page.goto(path)
   await page.getByRole("button", { name: text("invitation.accept"), exact: true }).click()
   await expect(page).toHaveURL(/\/dashboard$/)
-}
-
-/** Only moves time for a session created by this test; account setup stays through HTTP. */
-export function expireSudo(sessionId: string) {
-  if (!/^[0-9a-f-]{36}$/.test(sessionId)) throw new Error("Invalid session id")
-  const database = process.env.E2E_PGDATABASE ?? "starter_kit_e2e"
-  if (!/(?:e2e|test)/.test(database)) throw new Error("Sudo clock fixture requires an isolated e2e/test database")
-  execFileSync(
-    "psql",
-    [
-      "-X",
-      "-v",
-      "ON_ERROR_STOP=1",
-      "-c",
-      `UPDATE sessions SET sudo_until = NOW() - INTERVAL '1 minute' WHERE id = '${sessionId}'`,
-    ],
-    {
-      env: {
-        ...process.env,
-        PGDATABASE: database,
-        PGUSER: process.env.PGUSER ?? "postgres",
-        PGPASSWORD: process.env.PGPASSWORD ?? "postgres",
-      },
-      stdio: "pipe",
-    },
-  )
-}
-
-export function promoteAdmin(userId: string) {
-  if (!/^[0-9a-f-]{36}$/.test(userId)) throw new Error("Invalid user id")
-  const database = process.env.E2E_PGDATABASE ?? "starter_kit_e2e"
-  if (!/(?:e2e|test)/.test(database)) throw new Error("Admin fixture requires an isolated e2e/test database")
-  execFileSync(
-    "psql",
-    ["-X", "-v", "ON_ERROR_STOP=1", "-c", `UPDATE users SET role = 'superadmin' WHERE id = '${userId}'`],
-    {
-      env: {
-        ...process.env,
-        PGDATABASE: database,
-        PGUSER: process.env.PGUSER ?? "postgres",
-        PGPASSWORD: process.env.PGPASSWORD ?? "postgres",
-      },
-      stdio: "pipe",
-    },
-  )
-}
-
-/** Queue a real optional notification; the running API's worker delivers to its mailbox. */
-export function sendOptionalEmail(userId: string) {
-  if (!/^[0-9a-f-]{36}$/.test(userId)) throw new Error("Invalid user id")
-  const database = process.env.E2E_PGDATABASE ?? "starter_kit_e2e"
-  if (!/(?:e2e|test)/.test(database)) throw new Error("Mail fixture requires an isolated e2e/test database")
-  const apiDirectory =
-    process.env.E2E_API_DIR ?? new URL("../../../../phoenix-api-react-starter-kit", import.meta.url).pathname
-  execFileSync(
-    "mix",
-    [
-      "run",
-      "--no-start",
-      "-e",
-      `
-    Application.ensure_all_started(:ecto_sql)
-    Application.ensure_all_started(:postgrex)
-    Application.ensure_all_started(:oban)
-    Application.ensure_all_started(:plug_crypto)
-    {:ok, _} = StarterKit.Repo.start_link()
-    {:ok, _} = Oban.start_link(repo: StarterKit.Repo, queues: false, plugins: false)
-    user = StarterKit.Accounts.get_user!("${userId}")
-    {:ok, _} = StarterKit.Notifications.notify(user, :product_update, %{title: "Browser news", summary: "Test newsletter", url: "http://localhost:5173/"})
-  `,
-    ],
-    {
-      cwd: apiDirectory,
-      env: {
-        ...process.env,
-        MIX_ENV: "dev",
-        PGDATABASE: database,
-        SPA_ORIGIN: process.env.E2E_BASE_URL ?? "http://localhost:5173",
-      },
-      stdio: "pipe",
-      timeout: 30_000,
-    },
-  )
 }

@@ -600,3 +600,4 @@
 "errors.api.transfer_ownership","Make someone else an owner before deleting your account.","Nombra a otra persona como dueña antes de eliminar tu cuenta."
 "errors.api.subscription_active","Cancel the paid plan before deleting your account.","Cancela el plan de pago antes de eliminar tu cuenta."
 "errors.api.ai_unavailable","Text translation is unavailable right now. Try again later.","La traducción de textos no está disponible ahora. Probá más tarde."
+"errors.retry_after","Try again in {{count}} seconds.","Vuelve a intentar en {{count}} segundos."

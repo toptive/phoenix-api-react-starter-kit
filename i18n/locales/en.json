@@ -599,5 +599,6 @@
   "errors.api.email_unchanged": "This is already your email.",
   "errors.api.transfer_ownership": "Make someone else an owner before deleting your account.",
   "errors.api.subscription_active": "Cancel the paid plan before deleting your account.",
-  "errors.api.ai_unavailable": "Text translation is unavailable right now. Try again later."
+  "errors.api.ai_unavailable": "Text translation is unavailable right now. Try again later.",
+  "errors.retry_after": "Try again in {{count}} seconds."
 }

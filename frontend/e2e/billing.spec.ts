@@ -1,4 +1,4 @@
-import { test, expect, text, signedIn, promoteAdmin, routes } from "./fixtures"
+import { test, expect, text, signedIn, routes } from "./fixtures"
 import type { BillingOverview } from "../src/api/generated/serializers"
 
 // The kit's billing lane must enable the flag and stub Stripe's upstream HTTP,
@@ -12,9 +12,8 @@ test.beforeEach(() => {
 test("choose an offer, accept its price, return from checkout and wait for the paid plan", async ({
   page,
   api,
-  user,
+  admin: user,
 }) => {
-  promoteAdmin(user.user.id)
   await signedIn(page, user, "/settings/billing")
   await page.getByRole("radio").first().check()
   await page.getByRole("checkbox").check()
@@ -25,8 +24,7 @@ test("choose an offer, accept its price, return from checkout and wait for the p
     (await api.call<BillingOverview>(routes.apiV1SettingsBilling.show(), undefined, user.token)).subscription?.paid,
   ).toBe(true)
 })
-test("a subscribed manager opens the payment portal and returns to billing", async ({ page, user, api }) => {
-  promoteAdmin(user.user.id)
+test("a subscribed manager opens the payment portal and returns to billing", async ({ page, admin: user, api }) => {
   await signedIn(page, user, "/settings/billing")
   await page.getByRole("radio").first().check()
   await page.getByRole("checkbox").check()

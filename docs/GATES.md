@@ -83,63 +83,63 @@ Postgres allows 100 connections. Keep `POOL_SIZE` small (2–5) when several lan
 
 ## Browser journeys against the kit API
 
-Prefer end-to-end behavior tests: backend requests exercise the real router, auth, policies,
-database and serializers; SPA journeys use Chromium in `frontend/e2e/`. Vitest is for pure
-functions and HTTP envelope handling. Do not render components against mocked APIs.
-The browser suite never intercepts or replaces `/api/v1` responses. External services such
-as Stripe and AI are stubbed at the backend's upstream HTTP boundary.
+`pnpm e2e` runs Chromium journeys against a real API; `pnpm e2e:ui` opens the runner.
+Install Chromium once with `pnpm exec playwright install chromium`. Playwright owns Vite on
+5173, proxied to `E2E_API_URL` (default `http://localhost:4100`); `E2E_BASE_URL` uses an existing
+SPA. Reports and traces live in ignored `frontend/playwright-report/` and `frontend/test-results/`.
+No browser API mocks; external Stripe/AI adapters belong to the backend.
 
-Install once with `pnpm exec playwright install chromium`. Run `pnpm e2e` from the root;
-`pnpm e2e:ui` opens Playwright's UI. Playwright starts and stops Vite on 5173 with a proxy to
-`E2E_API_URL` (default `http://localhost:4100`). Setting `E2E_BASE_URL` uses an already running
-SPA instead. That SPA must point to the same API. Failure traces and screenshots are in
-`frontend/test-results/`; the HTML report is in `frontend/playwright-report/` (both ignored).
-
-The API must be running first. For the Phoenix API kit, the development fallback is:
+Phoenix development fallback (run from the API checkout):
 
 ```sh
-cd /path/to/phoenix-api-react-starter-kit
 PGDATABASE=starter_kit_e2e mix ecto.create
 PGDATABASE=starter_kit_e2e mix ecto.migrate
-PGDATABASE=starter_kit_e2e PORT=4100 VITE_PORT=5199 SPA_ORIGIN=http://localhost:5173 MAIL_ADAPTER=local mix phx.server
+OPENROUTER_API_KEY='' PGDATABASE=starter_kit_e2e PORT=4100 VITE_PORT=5199 SPA_ORIGIN=http://localhost:5173 mix phx.server
 ```
 
-`config/dev.exs` reads `PGDATABASE`, `PORT` and `VITE_PORT`; `runtime.exs` reads `SPA_ORIGIN`.
-The dev mailer already uses Swoosh Local (the current kit does not read `MAIL_ADAPTER`).
-`/dev/mailbox/json` returns recipient, text and HTML bodies; fixtures poll it to obtain
-single-use links. Set `E2E_MAILBOX_PATH` for another kit's equivalent test mailbox. Users,
-confirmation, onboarding and password setup all go through generated API routes. Fixtures
-respect rate limits and their real `Retry-After`; they create unique addresses per test.
+Then run `E2E_PGDATABASE=starter_kit_e2e pnpm e2e` from the SPA root. The dev mailer uses
+Swoosh Local. Global setup clears `/dev/mailbox/clear` using its CSRF form (or verifies the
+mailbox is already empty), then fixtures poll `/dev/mailbox/json` filtered by recipient and
+link prefix. Override `E2E_MAILBOX_PATH` / `E2E_MAILBOX_CLEAR_PATH` for another kit.
+Swoosh has no server-side recipient filter; keeping the mailbox bounded avoids large reads.
 
-The only direct database fixture adjustments are expiring a test session's sudo window
-(to exercise a real 403 without waiting ten minutes) and promoting a test account when
-admin journeys are enabled. They use `psql` and `E2E_PGDATABASE` (default `starter_kit_e2e`),
-with the normal local `PGHOST`/`PGPORT`/`PGUSER`/`PGPASSWORD` settings. A database name must
-contain `e2e` or `test`. Other kits should replace these two fixtures with their test helper;
-do not bypass registration or business actions. The unsubscribe journey queues a real optional
-notification through the Phoenix public context from a small `mix run --no-start` process
-with queues disabled; the running API delivers it to the mailbox. Set `E2E_API_DIR` to that
-checkout (default: the sibling Phoenix API kit used during SPA development). Other backend
-lanes replace this mail arrangement with their equivalent test helper. The browser still
-previews and opts out through the public API.
+`frontend/e2e/backend.ts` is the only per-kit seam. Each backend implements the same interface:
+`seedUser(email, admin?)` returns a confirmed account's fresh `{ token, expiresAt, sudoUntil }`;
+`expireSudo(sessionId)` expires only that session; `sendOptionalEmail(userId)` queues real
+optional mail. Phoenix uses `mix run --no-start --no-compile` with queues disabled and an isolated database:
+its seed pattern inserts a confirmed user and calls `Accounts.generate_api_token/1`; its first
+superadmin uses `Accounts.bootstrap_superadmin/1` (the hook behind
+`mix starter_kit.admin.bootstrap EMAIL`). Registration remains a real browser journey.
+Password setup, onboarding and subsequent business actions go through the API. Set
+`E2E_API_DIR` to the Phoenix checkout and `E2E_PGDATABASE` to a name containing `e2e` or `test`;
+normal local `PG*` settings apply. Rails/Rust replace this file with their test helper.
 
-Each backend lane wires this into its `bin/check` after request tests and frontend gates:
-create and migrate a dedicated E2E database; boot the API in test mode on 4100 with the local
-mailbox, HTTP stubs and normal DB connections available across requests; wait for `/health`;
-run `E2E_API_URL=http://localhost:4100 E2E_PGDATABASE=<isolated-db> pnpm e2e`; stop the API in
-an EXIT/INT/TERM trap, including on test failure. A Phoenix test server needs its test
-configuration to read the chosen port/database, enable test mailbox routes, start the
-endpoint and allow browser requests through its sandbox. The current backend test config
-is not yet a standalone E2E server; the commands above run in development until that lane
-lands. API boot is deliberately owned by `bin/check`, rather than a SPA script tied to Mix.
+Backend `bin/check` owns API boot: create/migrate the isolated DB, start the API with local
+mail and upstream stubs, wait for `/health`, run the frontend gates and `pnpm e2e`, and stop
+the API in an EXIT/INT/TERM trap. Phoenix currently uses development configuration because
+its test configuration is not a standalone browser server. If another lane edits the API,
+run an immutable snapshot of its committed revision in `/tmp`, with its own build directory,
+and point `E2E_API_DIR` there. Start it with `mix run --no-start --no-halt -e` and apply this endpoint override
+before `Application.ensure_all_started(:starter_kit)`:
 
-Admin journeys (texts edit/fill, impersonation/back, legal publication, audit and Jobs) have
-explicit `test.skip` reasons while the Phoenix admin lane is in progress. Set `E2E_ADMIN=1`
-when it has landed, with the backend's fake AI HTTP adapter for Fill. Billing checkout and
-portal journeys use `E2E_BILLING=1` once the billing API lane supplies Stripe test HTTP stubs
-and subscription fixtures. Skips are reported and must be removed or enabled in those lanes.
+```elixir
+endpoint = Application.get_env(:starter_kit, StarterKitWeb.Endpoint)
+Application.put_env(:starter_kit, StarterKitWeb.Endpoint,
+  Keyword.merge(endpoint, server: true, watchers: [], reloadable_apps: []))
+```
 
-`pnpm i18n:audit` checks English and Spanish, frontend key references, backend references,
-dynamic namespaces and plural variants. `pnpm lint` runs it as a gate. To remove genuinely
-unused keys, run `node i18n/scripts/audit.mjs --prune`, review the CSV diff, then
-`pnpm i18n:build`. Runtime and backend text must stay in the shared catalogue.
+The snapshot prevents config/lockfile changes from triggering Phoenix reload failures;
+`reloadable_apps: []` alone does not bypass its config-change check. Fixtures never compile.
+For a separate local Postgres port, set `PGPORT` for the fixtures and apply the same runtime
+Repo `:port` override when migrating and starting Phoenix (its dev config defaults to 5432).
+The suite uses one worker and
+respects real rate limits. Its final throttling journey asserts a browser 429 and Retry-After toast.
+
+Admin journeys run by default. Without AI configuration, Fill must show `ai_not_configured`
+in place; `E2E_AI=1` switches only the Fill assertion to success when the backend provides a
+test adapter. Only billing journeys remain skipped until `E2E_BILLING=1` supplies the billing
+API, Stripe test HTTP adapter and subscription fixtures.
+
+`pnpm lint` includes the catalogue audit. To prune unused frontend keys while preserving
+backend keys and dynamic/plural families, run `node i18n/scripts/audit.mjs --prune`, review
+the CSV diff, then `pnpm i18n:build`.

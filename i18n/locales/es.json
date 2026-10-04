@@ -599,5 +599,6 @@
   "errors.api.email_unchanged": "Este ya es tu email.",
   "errors.api.transfer_ownership": "Nombra a otra persona como dueña antes de eliminar tu cuenta.",
   "errors.api.subscription_active": "Cancela el plan de pago antes de eliminar tu cuenta.",
-  "errors.api.ai_unavailable": "La traducción de textos no está disponible ahora. Probá más tarde."
+  "errors.api.ai_unavailable": "La traducción de textos no está disponible ahora. Probá más tarde.",
+  "errors.retry_after": "Vuelve a intentar en {{count}} segundos."
 }
