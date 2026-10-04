@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { magicLinkToken } from "@/lib/sudo"
 import { limits } from "./limits"
 
 export const emailSchema = z
@@ -17,3 +18,7 @@ export const sudoSchema = z.object({ password: z.string().min(1, "validation.req
 export type SignInInput = z.infer<typeof signInSchema>
 export type MagicLinkInput = z.infer<typeof magicLinkSchema>
 export type RegistrationInput = z.infer<typeof registrationSchema>
+
+export const sudoLinkSchema = z.object({
+  link: z.string().refine((value) => Boolean(magicLinkToken(value)), "validation.magic_link"),
+})

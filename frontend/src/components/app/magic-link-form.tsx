@@ -14,7 +14,7 @@ import { magicLinkSchema } from "@/schemas/auth"
 import { applyFormErrors, fieldMessage } from "@/lib/form-errors"
 import { paths } from "@/lib/paths"
 /** Sign-in and sudo request the same scanner-safe magic link. */
-export function MagicLinkForm({ email = "" }: { email?: string }) {
+export function MagicLinkForm({ email = "", onSent }: { email?: string; onSent?: () => void }) {
   const { t } = useTranslation()
   const { turnstile } = useAppConfig()
   const navigate = useNavigate()
@@ -31,7 +31,8 @@ export function MagicLinkForm({ email = "" }: { email?: string }) {
       onSubmit={form.handleSubmit(async (input) => {
         try {
           const result = await request.mutateAsync(input)
-          void navigate({ to: paths.checkEmail, search: { email: result.email } })
+          if (onSent) onSent()
+          else void navigate({ to: paths.checkEmail, search: { email: result.email } })
         } catch (error) {
           applyFormErrors(error, form.setError)
         } finally {

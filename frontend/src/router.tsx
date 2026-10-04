@@ -121,7 +121,10 @@ const route = (path: string, guard: Guard, shell: Shell, component = reservedCom
     component,
     beforeLoad: ({ context, location }) => {
       guardRoute(guard, context.bootstrap, location.href)
-      if (location.pathname === "/session/new" && (location.search as Record<string, unknown>).returnTo)
+      if (
+        ["/session/new", "/registration/new", "/sudo/new"].includes(location.pathname) &&
+        (location.search as Record<string, unknown>).returnTo
+      )
         returnPath.set((location.search as Record<string, unknown>).returnTo)
     },
   })
@@ -184,7 +187,12 @@ const routes = [
     "auth",
     lazyRouteComponent(() => import("@/pages/auth/callback")),
   ),
-  route("/invitations/$token", "public", "auth"),
+  route(
+    "/invitations/$token",
+    "public",
+    "auth",
+    lazyRouteComponent(() => import("@/pages/invitations/show")),
+  ),
   route("/email-subscriptions/$token/opt-out", "public", "auth"),
   route(
     "/dashboard",
@@ -192,18 +200,73 @@ const routes = [
     "app",
     lazyRouteComponent(() => import("@/pages/dashboard/show")),
   ),
-  route("/onboarding/edit", "manager", "app"),
-  route("/organizations/new", "multi", "app"),
-  ...[
-    "profile/edit",
-    "appearance/edit",
-    "email-preferences/edit",
-    "sessions",
-    "organization/edit",
-    "members",
-    "billing",
-  ].map((path) => route(`/settings/${path}`, "user", "settings")),
-  ...["email/edit", "password/edit", "account/edit"].map((path) => route(`/settings/${path}`, "sudo", "settings")),
+  route(
+    "/onboarding/edit",
+    "manager",
+    "app",
+    lazyRouteComponent(() => import("@/pages/onboarding/edit")),
+  ),
+  route(
+    "/organizations/new",
+    "multi",
+    "app",
+    lazyRouteComponent(() => import("@/pages/organizations/new")),
+  ),
+  route(
+    "/settings/profile/edit",
+    "user",
+    "settings",
+    lazyRouteComponent(() => import("@/pages/settings/profile/edit")),
+  ),
+  route(
+    "/settings/appearance/edit",
+    "user",
+    "settings",
+    lazyRouteComponent(() => import("@/pages/settings/appearance/edit")),
+  ),
+  route(
+    "/settings/email-preferences/edit",
+    "user",
+    "settings",
+    lazyRouteComponent(() => import("@/pages/settings/email-preferences/edit")),
+  ),
+  route(
+    "/settings/sessions",
+    "user",
+    "settings",
+    lazyRouteComponent(() => import("@/pages/settings/sessions/index")),
+  ),
+  route(
+    "/settings/organization/edit",
+    "user",
+    "settings",
+    lazyRouteComponent(() => import("@/pages/settings/organization/edit")),
+  ),
+  route(
+    "/settings/members",
+    "user",
+    "settings",
+    lazyRouteComponent(() => import("@/pages/settings/members/index")),
+  ),
+  route("/settings/billing", "user", "settings"),
+  route(
+    "/settings/email/edit",
+    "sudo",
+    "settings",
+    lazyRouteComponent(() => import("@/pages/settings/email/edit")),
+  ),
+  route(
+    "/settings/password/edit",
+    "sudo",
+    "settings",
+    lazyRouteComponent(() => import("@/pages/settings/password/edit")),
+  ),
+  route(
+    "/settings/account/edit",
+    "sudo",
+    "settings",
+    lazyRouteComponent(() => import("@/pages/settings/account/edit")),
+  ),
   route(
     "/settings/email-confirmations/$token",
     "user",

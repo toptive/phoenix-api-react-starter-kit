@@ -4,6 +4,7 @@ import { Outlet, useRouterState } from "@tanstack/react-router"
 import { useTranslation } from "react-i18next"
 import { useBootstrap } from "@/api/hooks/bootstrap"
 import { useLocales } from "@/api/hooks/locales"
+import { SudoProvider } from "@/components/app/sudo-dialog"
 import { Toaster } from "@/components/ui/sonner"
 import ErrorShow from "@/pages/errors/show"
 import { ApiError } from "@/api/http"
@@ -42,7 +43,7 @@ function ReadyShell({ errorStatus }: { errorStatus?: number }) {
   const shell = useRouterState({ select: (state) => state.matches.at(-1)?.staticData.shell ?? "public" })
   const content = errorStatus ? <ErrorShow status={errorStatus} /> : <Outlet />
   return (
-    <>
+    <SudoProvider>
       <Suspense
         fallback={
           <p role="status" className="p-8">
@@ -65,6 +66,6 @@ function ReadyShell({ errorStatus }: { errorStatus?: number }) {
         )}
       </Suspense>
       <Toaster position="bottom-right" richColors closeButton />
-    </>
+    </SudoProvider>
   )
 }

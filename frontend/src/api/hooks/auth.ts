@@ -23,6 +23,7 @@ import type {
 import { qk } from "../query-keys"
 import { bootstrapOptions, useBootstrap } from "./bootstrap"
 import type { SignInInput, MagicLinkInput, RegistrationInput } from "@/schemas/auth"
+import { refreshOrganization } from "./organizations"
 import { safeReturnPath } from "@/lib/auth-flow"
 
 export async function acceptSession(qc: QueryClient, session: AuthSession) {
@@ -119,7 +120,8 @@ export function useGoogleCallback() {
 export function useEmailConfirmation(token: string) {
   return useQuery({
     queryKey: qk.emailConfirmation(token),
-    queryFn: async () => (await api.get<EmailChange>(apiV1SettingsEmailConfirmations.show(token))).data,
+    queryFn: async ({ signal }) =>
+      (await api.get<EmailChange>(apiV1SettingsEmailConfirmations.show(token), { signal })).data,
     enabled: Boolean(token),
     retry: false,
   })
@@ -129,8 +131,12 @@ export function useApplyEmailConfirmation() {
   return useMutation({
     mutationFn: async (token: string) =>
       (await api.post<User>(apiV1SettingsEmailConfirmations.create(), { token })).data,
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: qk.bootstrap })
+    onSuccess: async (_, token) => {
+      qc.removeQueries({ queryKey: qk.emailConfirmation(token) })
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: qk.bootstrap }),
+        qc.invalidateQueries({ queryKey: ["invitation"] }),
+      ])
     },
   })
 }
@@ -139,11 +145,7 @@ export function useSwitchOrganization() {
   return useMutation({
     mutationFn: async (organizationId: string) =>
       (await api.put<Auth>(apiV1CurrentOrganization.update(), { organizationId })).data,
-    onSuccess: async () => {
-      await qc.cancelQueries()
-      qc.removeQueries()
-      await qc.fetchQuery(bootstrapOptions())
-    },
+    onSuccess: () => refreshOrganization(qc),
   })
 }
 export function useStopImpersonation() {

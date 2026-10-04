@@ -25,7 +25,7 @@ try {
   const marker = '<div id="root"><!--landing--></div>'
   if (!template.includes(marker)) throw new Error("The landing placeholder is missing from the Vite output")
   const portable = join(frontend, "dist")
-  rmSync(portable, { recursive: true, force: true })
+  if (portable !== output) rmSync(portable, { recursive: true, force: true })
   for (const locale of readdirSync(resolve(frontend, "../i18n/locales"))
     .filter((file) => file.endsWith(".json"))
     .map((file) => file.slice(0, -5))) {
@@ -52,7 +52,7 @@ try {
     mkdirSync(dist, { recursive: true })
     writeFileSync(join(dist, "index.html"), page)
   }
-  cpSync(join(output, "assets"), join(portable, "assets"), { recursive: true })
+  if (portable !== output) cpSync(join(output, "assets"), join(portable, "assets"), { recursive: true })
   console.log("Prerendered landing pages for all bundled locales")
 } finally {
   rmSync(temporary, { recursive: true, force: true })

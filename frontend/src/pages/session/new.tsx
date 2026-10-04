@@ -35,7 +35,10 @@ function SignInForms() {
   const navigate = useNavigate()
   const { app } = useAppConfig()
   const search = useSearch({ strict: false }) as { email?: string; newAccount?: string }
-  const password = useForm({ resolver: zodResolver(signInSchema), defaultValues: { email: "", password: "" } })
+  const password = useForm({
+    resolver: zodResolver(signInSchema),
+    defaultValues: { email: search.email ?? "", password: "" },
+  })
   const login = useSignIn()
   return (
     <>
@@ -55,7 +58,7 @@ function SignInForms() {
         </TabsList>
         <TabsContent value="link" className="pt-4">
           {app.emailAvailable ? (
-            <MagicLinkForm />
+            <MagicLinkForm email={search.email} />
           ) : (
             <AlertBanner tone="warning" title={t("auth.unavailable.title")}>
               {t("auth.unavailable.session_body")}

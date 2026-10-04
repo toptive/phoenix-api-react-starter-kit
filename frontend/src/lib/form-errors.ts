@@ -36,3 +36,6 @@ export const fieldMessage = (
   message?: string,
   bindings: Record<string, string | number> = { count: limits.emailMax },
 ) => (message ? i18n.t(message, { ...bindings, defaultValue: message }) : undefined)
+
+export const boundedFieldMessage = (message: string | undefined, minimum: number, maximum: number) =>
+  fieldMessage(message, { count: message === "validation.length_min" ? minimum : maximum })

@@ -48,7 +48,7 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
                   <Link
                     href={item.href}
                     className={cn(
-                      "block rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground",
+                      "flex min-h-11 items-center rounded-md px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground",
                       url.startsWith(item.href) && "bg-accent font-medium text-accent-foreground",
                     )}
                   >
@@ -60,7 +60,7 @@ export function SettingsLayout({ children }: { children: ReactNode }) {
           </div>
         ))}
       </nav>
-      <div className="min-w-0 max-w-2xl">{children}</div>
+      <div className="max-w-2xl min-w-0">{children}</div>
     </div>
   )
 }

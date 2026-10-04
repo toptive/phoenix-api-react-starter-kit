@@ -90,7 +90,7 @@ export async function request<T>(
     )
       sessionExpired()
     if (response.status === 429) toast.error(error.message)
-    reportApiFailure(response.status)
+    if (!["sudo_required", "email_unavailable"].includes(error.code)) reportApiFailure(response.status)
     throw error
   }
   if (!("data" in payload))

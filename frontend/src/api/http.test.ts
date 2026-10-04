@@ -1,4 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest"
+import { reportApiFailure } from "@/lib/api-failure"
 import { toast } from "sonner"
 import {
   api,
@@ -11,9 +12,10 @@ import {
   ADMIN_TOKEN_KEY,
   setUnauthorizedHandler,
 } from "./http"
-import { apiV1Bootstrap, apiV1AuthSessions, apiV1Locales } from "./generated/routes"
+import { apiV1Bootstrap, apiV1AuthSessions, apiV1AuthSudo, apiV1Locales } from "./generated/routes"
 import { i18n } from "@/i18n"
 
+vi.mock("@/lib/api-failure", () => ({ reportApiFailure: vi.fn() }))
 vi.mock("sonner", () => ({ toast: { error: vi.fn() } }))
 const fetchStub = vi.fn<typeof fetch>()
 beforeEach(() => {
@@ -21,6 +23,7 @@ beforeEach(() => {
   configureApi("")
   vi.stubGlobal("fetch", fetchStub)
   fetchStub.mockReset()
+  vi.mocked(reportApiFailure).mockClear()
   void i18n.changeLanguage("en")
 })
 afterEach(() => {
@@ -115,11 +118,21 @@ describe("HTTP transport", () => {
     fetchStub.mockResolvedValue(
       Response.json({ error: { code: "invalid_credentials", message: "Try again", details: {} } }, { status: 401 }),
     )
-    await expect(api.post(apiV1AuthSessions.create(), { password: "wrong" })).rejects.toMatchObject({
+    await expect(api.post(apiV1AuthSudo.create(), { password: "wrong" })).rejects.toMatchObject({
       code: "invalid_credentials",
     })
     expect(getToken()).toBe("existing")
     expect(redirect).not.toHaveBeenCalled()
+  })
+  it("leaves sudo and unavailable-email failures in the current form", async () => {
+    for (const [status, code] of [
+      [403, "sudo_required"],
+      [503, "email_unavailable"],
+    ] as const) {
+      fetchStub.mockResolvedValue(Response.json({ error: { code, message: "Try again", details: {} } }, { status }))
+      await expect(api.post(apiV1AuthSessions.create())).rejects.toMatchObject({ code, status })
+    }
+    expect(reportApiFailure).not.toHaveBeenCalled()
   })
   it("toasts rate-limit messages and still rejects for the caller", async () => {
     fetchStub.mockResolvedValue(

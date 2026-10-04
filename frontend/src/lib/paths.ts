@@ -3,6 +3,7 @@ export const paths = {
   home: (locale = "en") => (locale === "en" ? "/" : `/${encodeURIComponent(locale)}`),
   legal: (slug: string, locale = "en") =>
     `${locale === "en" ? "" : `/${encodeURIComponent(locale)}`}/legal/${encodeURIComponent(slug)}`,
+  invitation: (token: string) => `/invitations/${encodeURIComponent(token)}`,
   signIn: "/session/new",
   register: "/registration/new",
   checkEmail: "/session/check-your-email",

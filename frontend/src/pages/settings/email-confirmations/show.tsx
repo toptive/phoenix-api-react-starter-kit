@@ -1,6 +1,8 @@
 import { useParams, useNavigate } from "@tanstack/react-router"
 import { useTranslation } from "react-i18next"
 import { useEmailConfirmation, useApplyEmailConfirmation } from "@/api/hooks/auth"
+import { QueryState } from "@/components/app/query-state"
+import { TextLink } from "@/components/app/text-link"
 import { AuthHeading } from "@/components/app/auth-card"
 import { FormError } from "@/components/app/form-error"
 import { Button } from "@/components/ui/button"
@@ -11,10 +13,16 @@ export default function EmailConfirmationPage() {
   const { token = "" } = useParams({ strict: false }) as { token?: string }
   const preview = useEmailConfirmation(token)
   const confirm = useApplyEmailConfirmation()
-  if (preview.isPending) return <p role="status">{t("common.loading")}</p>
-  if (preview.error) return <FormError error={preview.error} />
+  if (!preview.data)
+    return (
+      <>
+        <QueryState pending={preview.isPending} error={preview.error} retry={preview.refetch} />
+        <TextLink href={paths.email}>{t("settings.email_confirmation.request_new")}</TextLink>
+      </>
+    )
   return (
     <>
+      <title>{t("settings.email_confirmation.title")}</title>
       <AuthHeading
         title={t("settings.email_confirmation.title")}
         description={t("settings.email_confirmation.lead", { email: preview.data?.email })}
