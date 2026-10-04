@@ -2,10 +2,10 @@
 
 import { buildUrl, type RouteDefinition, type RouteOptions } from "./runtime";
 
-export const settingsBilling = {
-  /** GET /settings/billing */
+export const apiV1SettingsBilling = {
+  /** GET /api/v1/settings/billing */
   show: (options?: RouteOptions): RouteDefinition<"get"> => ({
-    url: buildUrl("/settings/billing", {}, options),
+    url: buildUrl("/api/v1/settings/billing", {}, options),
     method: "get",
   }),
 } as const;

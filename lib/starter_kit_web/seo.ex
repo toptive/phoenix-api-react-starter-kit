@@ -1,13 +1,5 @@
 defmodule StarterKitWeb.SEO do
-  @moduledoc """
-  Per-page SEO for public pages: title, description, canonical, hreflang alternates,
-  Open Graph and JSON-LD. Controllers pass the result as the `seo` prop; the React
-  `<Seo>` component renders the tags inside Inertia's `<Head>` (server-rendered).
-
-      conn
-      |> assign(:indexable, true)
-      |> render_inertia("home/show", %{seo: SEO.build(conn, path: "/", title: t(conn, "home.seo.title"), …)}, ssr: true)
-  """
+  @moduledoc "Public SPA URL and locale mappings, with legacy head projections pending SPA delivery."
 
   alias StarterKit.I18n
 
@@ -120,5 +112,7 @@ defmodule StarterKitWeb.SEO do
   defp absolute("http" <> _ = url), do: url
   defp absolute(path), do: url(path)
 
-  defp url(path), do: StarterKitWeb.Endpoint.url() <> path
+  @doc "Absolute public SPA URL, shared by crawler infrastructure."
+  def url(path),
+    do: String.trim_trailing(Application.fetch_env!(:starter_kit, :public_url), "/") <> path
 end

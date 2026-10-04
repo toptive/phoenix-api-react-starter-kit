@@ -14,7 +14,6 @@ import type { RegistrationNewProps } from "./registration/new.props";
 import type { SessionNewProps } from "./session/new.props";
 import type { SettingsAccountEditProps } from "./settings/account/edit.props";
 import type { SettingsAppearanceEditProps } from "./settings/appearance/edit.props";
-import type { SettingsBillingShowProps } from "./settings/billing/show.props";
 import type { SettingsEmailConfirmationsShowProps } from "./settings/email-confirmations/show.props";
 import type { SettingsEmailPreferencesEditProps } from "./settings/email-preferences/edit.props";
 import type { SettingsEmailEditProps } from "./settings/email/edit.props";
@@ -39,7 +38,6 @@ export type {
   SessionNewProps,
   SettingsAccountEditProps,
   SettingsAppearanceEditProps,
-  SettingsBillingShowProps,
   SettingsEmailConfirmationsShowProps,
   SettingsEmailPreferencesEditProps,
   SettingsEmailEditProps,
@@ -64,7 +62,6 @@ export interface Pages {
   "session/new": SessionNewProps;
   "settings/account/edit": SettingsAccountEditProps;
   "settings/appearance/edit": SettingsAppearanceEditProps;
-  "settings/billing/show": SettingsBillingShowProps;
   "settings/email-confirmations/show": SettingsEmailConfirmationsShowProps;
   "settings/email-preferences/edit": SettingsEmailPreferencesEditProps;
   "settings/email/edit": SettingsEmailEditProps;

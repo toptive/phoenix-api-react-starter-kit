@@ -118,3 +118,5 @@ from idle pooled connections that kamal-proxy keeps open (kamal-proxy 0.9 sets n
 for them), and Bandit closes them after its read timeout. No visitor sees an error. Change
 nothing; look again only if `/health` checks or real requests fail. (Investigated on a product in
 2026-10: four such lines, zero failed requests.)
+
+Public links and crawler infrastructure use `PUBLIC_URL` (falls back to `SPA_ORIGIN`). The API origin for machine unsubscribe headers is `API_URL` / `API_ORIGIN`, defaulting to the Phoenix host and port. Keep public and API origins distinct when deploying separate hosts.

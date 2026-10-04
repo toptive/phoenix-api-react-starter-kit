@@ -2,10 +2,10 @@
 
 import { buildUrl, type RouteDefinition, type RouteOptions } from "./runtime";
 
-export const settingsBillingCheckoutSession = {
-  /** POST /settings/billing/checkout-session */
+export const apiV1SettingsBillingCheckoutSession = {
+  /** POST /api/v1/settings/billing/checkout-session */
   create: (options?: RouteOptions): RouteDefinition<"post"> => ({
-    url: buildUrl("/settings/billing/checkout-session", {}, options),
+    url: buildUrl("/api/v1/settings/billing/checkout-session", {}, options),
     method: "post",
   }),
 } as const;

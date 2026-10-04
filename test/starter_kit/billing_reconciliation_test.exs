@@ -80,7 +80,7 @@ defmodule StarterKit.BillingReconciliationTest do
     assert Repo.get_by!(Event, stripe_subscription_id: "sub_1").outcome == "synced"
 
     assert Repo.get_by(AuditEvent,
-             action: "billing.subscription_synced",
+             action: "billing.subscription_changed",
              organization_id: scope.organization.id
            )
   end

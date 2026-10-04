@@ -15,13 +15,17 @@ env = fn name ->
   end
 end
 
-spa_origin = env.("SPA_ORIGIN") || if(config_env() != :prod, do: "http://localhost:5173")
+spa_origin =
+  env.("PUBLIC_URL") || env.("SPA_ORIGIN") || if(config_env() != :prod, do: "http://localhost:5173")
+
 cors_origins = env.("CORS_ORIGINS") || if(config_env() != :prod, do: spa_origin)
 if is_nil(spa_origin), do: raise("SPA_ORIGIN is required in production")
 if is_nil(cors_origins), do: raise("CORS_ORIGINS is required in production")
 
 config :starter_kit,
   spa_origin: spa_origin,
+  public_url: env.("PUBLIC_URL") || spa_origin,
+  api_origin: env.("API_URL") || env.("API_ORIGIN") || "http://localhost:#{env.("PORT") || "4000"}",
   native_scheme: env.("NATIVE_SCHEME") || "starterkit",
   cors_origins:
     Enum.uniq(
@@ -173,7 +177,8 @@ if config_env() == :prod do
 
   host = env.("PHX_HOST") || "example.com"
 
-  config :starter_kit, :public_url, "https://#{host}"
+  config :starter_kit, :public_url, env.("PUBLIC_URL") || spa_origin
+  config :starter_kit, :api_origin, env.("API_URL") || env.("API_ORIGIN") || "https://#{host}"
 
   # Plugs.CanonicalHost: every other host gets a 301 to this one.
   config :starter_kit, :canonical_host, host
@@ -181,7 +186,8 @@ if config_env() == :prod do
   config :starter_kit, :dns_cluster_query, env.("DNS_CLUSTER_QUERY")
 
   # Where billing emails send people to manage their plan (jobs have no request URL).
-  config :starter_kit, StarterKit.Billing, manage_url: "https://#{host}/settings/billing"
+  config :starter_kit, StarterKit.Billing,
+    manage_url: String.trim_trailing(env.("PUBLIC_URL") || spa_origin, "/") <> "/settings/billing"
 
   config :starter_kit, StarterKitWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
@@ -190,8 +196,6 @@ if config_env() == :prod do
     secret_key_base: secret_key_base
 
   config :starter_kit,
-    ssr: env.("SSR") != "0",
-    ssr_pool_size: String.to_integer(env.("SSR_POOL_SIZE") || "1"),
     app_name: env.("APP_NAME") || "StarterKit"
 
   config :starter_kit, Oban,

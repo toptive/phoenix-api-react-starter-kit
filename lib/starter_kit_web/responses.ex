@@ -8,7 +8,6 @@ defmodule StarterKitWeb.Responses do
   import Phoenix.Controller
 
   alias StarterKit.I18n
-  alias StarterKitWeb.Plugs.PublicPage
 
   @doc "SPA sign-in destination for unconverted browser areas."
   def spa_sign_in_url, do: StarterKitWeb.ApiAuth.spa_url("/session/new")
@@ -40,27 +39,13 @@ defmodule StarterKitWeb.Responses do
   # matches the camelCase field names of the React forms.
   defp assign_form_errors(conn, errors), do: Inertia.Controller.assign_errors(conn, errors)
 
-  @doc """
-  Renders a public, indexable page. Server-side rendered when SSR is on
-  (`config :starter_kit, :ssr`), so crawlers get full HTML. An anonymous full-page load
-  is cacheable and can answer `304` before SSR (`StarterKitWeb.Plugs.PublicPage.cache/3`).
-  """
-  def render_public(conn, component, props) do
-    conn = assign(conn, :indexable, true)
-
-    case PublicPage.cache(conn, component, props) do
-      {:not_modified, conn} ->
-        send_resp(conn, 304, "")
-
-      {:render, conn} ->
-        Inertia.Controller.render_inertia(conn, component, props,
-          ssr: Application.get_env(:starter_kit, :ssr, false)
-        )
-    end
-  end
-
   @doc "Success envelope. Pass a serialized map or `{serializer, value}`."
-  def render_data(conn, data, meta \\ %{}) do
+  def render_data(conn, data, meta \\ %{})
+
+  def render_data(%{request_path: "/webhooks/stripe/events"} = conn, %{received: true}, _meta),
+    do: json(conn, %{received: true})
+
+  def render_data(conn, data, meta) do
     data =
       case data do
         {serializer, value} -> serializer.serialize(value)

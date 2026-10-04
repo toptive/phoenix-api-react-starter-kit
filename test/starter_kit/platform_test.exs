@@ -1,8 +1,7 @@
 defmodule StarterKit.PlatformTest do
   use StarterKit.DataCase, async: true
 
-  alias StarterKit.{AI, Analytics, Uploads}
-  alias StarterKit.Uploads.UploadGuard
+  alias StarterKit.{AI, Analytics}
 
   describe "Analytics" do
     test "tracks catalogued events with allowed properties only" do
@@ -40,26 +39,6 @@ defmodule StarterKit.PlatformTest do
 
       assert_received {:analytics, %{properties: %{"plan" => "pro", "mode" => "live"} = props}}
       refute Map.has_key?(props, "interval")
-
-      Analytics.track("public_page_viewed", nil, %{
-        page_type: "home.show",
-        path: "/es/legal/terms",
-        utm_source: "a@b.co",
-        utm_campaign: "launch-2026",
-        referrer_domain: "https://evil.example/?token=1"
-      })
-
-      assert_received {:analytics, %{properties: props}}
-
-      assert Map.delete(props, "$process_person_profile") == %{
-               "page_type" => "home.show",
-               "path" => "/es/legal/terms",
-               "utm_campaign" => "launch-2026"
-             }
-
-      Analytics.track("public_page_viewed", nil, %{path: "/reset?token=1", page_type: "x y"})
-      assert_received {:analytics, %{properties: props}}
-      assert props == %{"$process_person_profile" => false}
     end
 
     test "track_after_commit/4 tracks a committed write only and returns the result" do
@@ -91,31 +70,6 @@ defmodule StarterKit.PlatformTest do
       Process.put(:ai_response, {:ok, %{"choices" => [%{"message" => %{"content" => "hi"}}]}})
       assert {:ok, "hi"} = AI.chat([%{role: "user", content: "hello"}])
       assert_received {:ai_request, "https://openrouter.ai/api/v1/chat/completions", %{model: _}}
-    end
-  end
-
-  describe "Uploads" do
-    test "presigns allowed files and refuses the rest" do
-      params = %{
-        "filename" => "My Photo.JPG",
-        "content_type" => "image/jpeg",
-        "byte_size" => 1000,
-        "kind" => "image"
-      }
-
-      assert {:ok, %{url: url, key: key}} = Uploads.presign("org-1", params)
-      assert url =~ "X-Amz-Signature"
-      assert key =~ ~r{^uploads/org-1/.+/my-photo\.jpg$}
-
-      assert {:error, :content_type_not_allowed} =
-               Uploads.presign("org-1", %{params | "content_type" => "image/svg+xml"})
-
-      assert {:error, :too_large} = Uploads.presign("org-1", %{params | "byte_size" => 50_000_000})
-    end
-
-    test "sniffs real file types" do
-      assert UploadGuard.sniff(<<0x89, "PNG", 0x0D, 0x0A, 0x1A, 0x0A, 0>>) == "image/png"
-      refute UploadGuard.bytes_allowed?("image", "<svg xmlns=")
     end
   end
 end

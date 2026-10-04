@@ -1,5 +1,5 @@
 defmodule StarterKitWeb.HomeController do
-  @moduledoc "The landing page (public, server-rendered)."
+  @moduledoc "The landing page (legacy view until SPA delivery replaces it)."
   use StarterKitWeb, :controller
   use Typelizer.InertiaPage
 
@@ -12,7 +12,7 @@ defmodule StarterKitWeb.HomeController do
 
     conn
     |> skip_authorization()
-    |> render_public("home/show", %{
+    |> render_inertia("home/show", %{
       seo:
         SEO.build(conn,
           path: "/",

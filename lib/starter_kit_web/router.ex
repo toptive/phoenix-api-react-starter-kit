@@ -33,12 +33,6 @@ defmodule StarterKitWeb.Router do
     plug Plugs.InertiaShare
   end
 
-  # Public, indexable pages: anonymous visitors get a cookie-free, cacheable page
-  # (Plugs.PublicPage); a request with a cookie gets the normal browser chain.
-  pipeline :public do
-    plug Plugs.PublicPage
-  end
-
   pipeline :api do
     plug :accepts, ["json"]
     plug :fetch_query_params
@@ -55,11 +49,6 @@ defmodule StarterKitWeb.Router do
   # No session: error messages use the default locale (the reader is a machine).
   pipeline :webhook do
     plug :accepts, ["json"]
-  end
-
-  # Public pages: a cookie-free, server-side page view (Plugs.PageViews).
-  pipeline :page_views do
-    plug Plugs.PageViews
   end
 
   pipeline :authenticated do
@@ -114,10 +103,10 @@ defmodule StarterKitWeb.Router do
     get "/robots.txt", RobotsController, :show
   end
 
-  # Public pages, server-rendered for SEO: default locale at "/…", other locales at
+  # Legacy landing views until SPA delivery replaces them: default locale at "/…", other locales at
   # "/:locale/…" (the localized scope at the END of this file).
   scope "/", StarterKitWeb do
-    pipe_through [:public, :browser, :page_views]
+    pipe_through [:browser]
 
     get "/", HomeController, :show
   end
@@ -130,16 +119,6 @@ defmodule StarterKitWeb.Router do
 
     scope "/settings", Settings, as: :settings do
       resources "/appearance", AppearanceController, only: [:edit], singleton: true
-
-      resources "/billing", BillingController, only: [:show], singleton: true
-
-      resources "/billing/checkout-session", BillingCheckoutSessionController,
-        only: [:create],
-        singleton: true
-
-      resources "/billing/portal-session", BillingPortalSessionController,
-        only: [:create],
-        singleton: true
     end
   end
 
@@ -223,6 +202,9 @@ defmodule StarterKitWeb.Router do
     post "/invitations/:token/acceptance", InvitationAcceptanceController, :create
 
     scope "/settings", Settings, as: :settings do
+      get "/billing", BillingController, :show
+      post "/billing/checkout-session", BillingCheckoutSessionController, :create
+      post "/billing/portal-session", BillingPortalSessionController, :create
       put "/profile", ProfileController, :update
       get "/email-preferences", EmailPreferenceController, :show
       put "/email-preferences", EmailPreferenceController, :update
@@ -263,7 +245,7 @@ defmodule StarterKitWeb.Router do
   # 404 for an unknown locale and redirects the default locale to the unprefixed URL.
   # The frontend fills :locale through typelizer URL defaults (setUrlDefaults).
   scope "/:locale", StarterKitWeb, as: :localized do
-    pipe_through [:localized, :public, :browser, :page_views]
+    pipe_through [:localized, :browser]
 
     get "/", HomeController, :show
   end

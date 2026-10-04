@@ -31,7 +31,7 @@ defmodule StarterKit.Application do
         {Oban, Application.fetch_env!(:starter_kit, Oban)},
         StarterKit.I18n,
         StarterKitWeb.RateLimit
-      ] ++ ssr_children() ++ [StarterKitWeb.Endpoint]
+      ] ++ [StarterKitWeb.Endpoint]
 
     Supervisor.start_link(children, strategy: :one_for_one, name: StarterKit.Supervisor)
   end
@@ -44,20 +44,6 @@ defmodule StarterKit.Application do
         billing: &StarterKit.Billing.config_problems/0,
         turnstile: &StarterKit.AbuseProtection.config_problems/0
       )
-    end
-  end
-
-  # Node workers for Inertia SSR (public pages only). One worker is enough for a small
-  # app; raise SSR_POOL_SIZE only when SSR latency shows queueing. docs/PERFORMANCE.md
-  defp ssr_children do
-    if Application.get_env(:starter_kit, :ssr, false) do
-      [
-        {Inertia.SSR,
-         path: Path.join(Application.app_dir(:starter_kit, "priv"), "ssr"),
-         pool_size: Application.get_env(:starter_kit, :ssr_pool_size, 1)}
-      ]
-    else
-      []
     end
   end
 

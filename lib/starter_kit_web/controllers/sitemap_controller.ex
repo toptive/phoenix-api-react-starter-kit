@@ -13,7 +13,7 @@ defmodule StarterKitWeb.SitemapController do
         do: ["/" | Enum.map(Legal.published_slugs(), &"/legal/#{&1}")],
         else: []
 
-    base = StarterKitWeb.Endpoint.url()
+    base = SEO.url("") |> Phoenix.HTML.html_escape() |> Phoenix.HTML.safe_to_string()
 
     urls =
       for path <- paths, locale <- I18n.locales() do

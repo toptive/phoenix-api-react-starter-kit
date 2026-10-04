@@ -128,7 +128,7 @@ defmodule StarterKit.Notifications do
   def unsubscribe_url(user_id, email) do
     token = Plug.Crypto.sign(secret_key_base(), @unsubscribe_salt, [user_id, email_hash(email)])
 
-    "#{Application.fetch_env!(:starter_kit, :public_url)}/api/v1/email-subscriptions/#{token}/opt-out"
+    "#{String.trim_trailing(Application.fetch_env!(:starter_kit, :api_origin), "/")}/api/v1/email-subscriptions/#{token}/opt-out"
   end
 
   @doc "The SPA footer link; scanners can open it without unsubscribing."

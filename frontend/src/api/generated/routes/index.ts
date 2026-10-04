@@ -32,6 +32,9 @@ import { apiV1Locale } from "./apiV1Locale";
 import { apiV1Onboarding } from "./apiV1Onboarding";
 import { apiV1Organization } from "./apiV1Organization";
 import { apiV1SettingsAccount } from "./apiV1SettingsAccount";
+import { apiV1SettingsBilling } from "./apiV1SettingsBilling";
+import { apiV1SettingsBillingCheckoutSession } from "./apiV1SettingsBillingCheckoutSession";
+import { apiV1SettingsBillingPortalSession } from "./apiV1SettingsBillingPortalSession";
 import { apiV1SettingsEmail } from "./apiV1SettingsEmail";
 import { apiV1SettingsEmailConfirmation } from "./apiV1SettingsEmailConfirmation";
 import { apiV1SettingsEmailPreference } from "./apiV1SettingsEmailPreference";
@@ -47,9 +50,6 @@ import { home } from "./home";
 import { localizedHome } from "./localizedHome";
 import { robots } from "./robots";
 import { settingsAppearance } from "./settingsAppearance";
-import { settingsBilling } from "./settingsBilling";
-import { settingsBillingCheckoutSession } from "./settingsBillingCheckoutSession";
-import { settingsBillingPortalSession } from "./settingsBillingPortalSession";
 import { sitemap } from "./sitemap";
 import { webDashboard } from "./webDashboard";
 import { webhooksStripeEvent } from "./webhooksStripeEvent";
@@ -87,6 +87,9 @@ export {
   apiV1Onboarding,
   apiV1Organization,
   apiV1SettingsAccount,
+  apiV1SettingsBilling,
+  apiV1SettingsBillingCheckoutSession,
+  apiV1SettingsBillingPortalSession,
   apiV1SettingsEmail,
   apiV1SettingsEmailConfirmation,
   apiV1SettingsEmailPreference,
@@ -102,9 +105,6 @@ export {
   localizedHome,
   robots,
   settingsAppearance,
-  settingsBilling,
-  settingsBillingCheckoutSession,
-  settingsBillingPortalSession,
   sitemap,
   webDashboard,
   webhooksStripeEvent,
@@ -155,6 +155,9 @@ export const routes = {
   apiV1Onboarding,
   apiV1Organization,
   apiV1SettingsAccount,
+  apiV1SettingsBilling,
+  apiV1SettingsBillingCheckoutSession,
+  apiV1SettingsBillingPortalSession,
   apiV1SettingsEmail,
   apiV1SettingsEmailConfirmation,
   apiV1SettingsEmailPreference,
@@ -170,9 +173,6 @@ export const routes = {
   localizedHome,
   robots,
   settingsAppearance,
-  settingsBilling,
-  settingsBillingCheckoutSession,
-  settingsBillingPortalSession,
   sitemap,
   webDashboard,
   webhooksStripeEvent,

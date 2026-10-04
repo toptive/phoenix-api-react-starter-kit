@@ -79,6 +79,25 @@ defmodule StarterKit.Billing do
     |> binary_part(0, 16)
   end
 
+  @doc "The current tenant's billing overview, including access while sales are off."
+  def overview(scope) do
+    subscription = current_subscription(scope)
+
+    if enabled?() or subscription do
+      {:ok,
+       %{
+         plan: plan(scope),
+         subscription: subscription,
+         offers: list_offers(),
+         offer_revision: offer_revision(),
+         sales: %{status: sales(scope.user), test_mode: mode() == :test},
+         can_manage: StarterKit.Policy.allowed?(scope, :manage_billing, scope.organization)
+       }}
+    else
+      {:error, :not_found}
+    end
+  end
+
   ## Plans and limits
 
   @doc """
@@ -741,7 +760,7 @@ defmodule StarterKit.Billing do
   end
 
   defp audit_sync(org_id, attrs) do
-    Audit.record("billing.subscription_synced",
+    Audit.record("billing.subscription_changed",
       organization_id: org_id,
       metadata: Map.take(attrs, [:plan, :status, :offer_id, :stripe_subscription_id])
     )

@@ -1,111 +1,136 @@
 defmodule StarterKitWeb.PublicTest do
-  use StarterKitWeb.ConnCase, async: true
+  use StarterKitWeb.ConnCase, async: false
+  alias StarterKit.{Accounts, Legal}
 
-  test "the landing page is indexable and carries SEO props", %{conn: conn} do
-    conn = get(conn, ~p"/")
-    assert inertia_component(conn) == "home/show"
-    seo = inertia_props(conn).seo
-    assert seo.canonical == "http://localhost:4002/"
-    assert Enum.map(seo.alternates, & &1.hreflang) == ["en", "es", "x-default"]
-    refute html_response(conn, 200) =~ ~s(name="robots" content="noindex")
+  defmodule UnavailableRepo do
+    use Ecto.Repo, otp_app: :starter_kit, adapter: Ecto.Adapters.Postgres
   end
 
-  test "every page carries the public flags", %{conn: conn} do
-    assert inertia_props(get(conn, ~p"/")).flags == %{billing: true}
-
-    put_flag(:billing, false)
-    assert inertia_props(get(conn, ~p"/")).flags == %{billing: false}
+  setup %{conn: conn} do
+    previous = Application.get_env(:starter_kit, :public_url)
+    Application.put_env(:starter_kit, :public_url, "https://app.example.com")
+    on_exit(fn -> Application.put_env(:starter_kit, :public_url, previous) end)
+    %{conn: conn}
   end
 
-  test "localized public routes set the locale from the path", %{conn: conn} do
-    conn = get(conn, ~p"/es")
-    assert inertia_props(conn).locale == "es"
-    assert inertia_props(conn).seo.canonical == "http://localhost:4002/es"
+  test "health answers text, no-store and never a canonical-host redirect", %{conn: conn} do
+    previous = Application.get_env(:starter_kit, :canonical_host)
+    Application.put_env(:starter_kit, :canonical_host, "api.example.com")
+    on_exit(fn -> Application.put_env(:starter_kit, :canonical_host, previous) end)
+    result = get(conn, ~p"/health")
+    assert response(result, 200) == "ok"
+    assert get_resp_header(result, "content-type") == ["text/plain; charset=utf-8"]
+    assert get_resp_header(result, "cache-control") == ["no-store"]
+    assert get_resp_header(result, "set-cookie") == []
   end
 
-  test "the default locale has one canonical URL and unknown locales do not exist", %{conn: conn} do
-    assert conn |> get("/en") |> redirected_to(301) == "/"
-    assert conn |> get("/xx") |> html_response(404)
+  @tag :capture_log
+  test "health returns text 503 and no-store while its database is unavailable", %{conn: conn} do
+    start_supervised!(
+      {UnavailableRepo,
+       hostname: "127.0.0.1",
+       port: 1,
+       username: "test",
+       password: "test",
+       database: "unavailable",
+       pool_size: 1,
+       queue_target: 10,
+       queue_interval: 100}
+    )
+
+    previous = Application.get_env(:starter_kit, StarterKit.Health)
+    Application.put_env(:starter_kit, StarterKit.Health, repo: UnavailableRepo)
+    on_exit(fn -> Application.put_env(:starter_kit, StarterKit.Health, previous) end)
+    result = get(conn, ~p"/health")
+    assert response(result, 503) == "database unavailable"
+    assert get_resp_header(result, "content-type") == ["text/plain; charset=utf-8"]
+    assert get_resp_header(result, "cache-control") == ["no-store"]
   end
 
-  test "sitemap, robots and health", %{conn: conn} do
-    sitemap = conn |> get(~p"/sitemap.xml") |> response(200)
-    assert sitemap =~ "<loc>http://localhost:4002/es</loc>"
-    assert sitemap =~ ~s(hreflang="es")
+  test "sitemap lists home and only published legal pages in every locale with alternates", %{
+    conn: conn
+  } do
+    scope = Accounts.Scope.for_user(superadmin_fixture())
+    terms = Legal.get_document!(scope, "terms")
 
-    robots = conn |> get(~p"/robots.txt") |> response(200)
-    assert robots =~ "Disallow: /admin"
-    assert robots =~ "Sitemap: http://localhost:4002/sitemap.xml"
+    {:ok, _} =
+      Legal.create_version(scope, terms, %{titles: %{"en" => "Terms"}, bodies: %{"en" => "Text"}},
+        publish: true
+      )
 
-    assert conn |> get(~p"/health") |> response(200) == "ok"
+    privacy = Legal.get_document!(scope, "privacy")
+
+    {:ok, _} =
+      Legal.create_version(scope, privacy, %{
+        titles: %{"en" => "Privacy"},
+        bodies: %{"en" => "Text"}
+      })
+
+    result = get(conn, ~p"/sitemap.xml")
+    xml = response(result, 200)
+    assert get_resp_header(result, "content-type") == ["application/xml; charset=utf-8"]
+    assert get_resp_header(result, "set-cookie") == []
+    assert length(Regex.scan(~r/<url>/, xml)) == 4
+
+    for path <- ["/", "/es", "/legal/terms", "/es/legal/terms"],
+        do: assert(xml =~ "<loc>https://app.example.com#{path}</loc>")
+
+    refute xml =~ "/legal/privacy"
+    refute xml =~ "/legal/cookies"
+
+    for {locale, path} <- [
+          {"en", "/"},
+          {"es", "/es"},
+          {"en", "/legal/terms"},
+          {"es", "/es/legal/terms"}
+        ] do
+      assert length(
+               Regex.scan(
+                 ~r/#{Regex.escape("hreflang=\"#{locale}\" href=\"https://app.example.com#{path}\"")}/,
+                 xml
+               )
+             ) == 2
+    end
   end
 
-  test "the whole catalogue goes on a full load, not on Inertia visits that have it", %{conn: conn} do
-    first = get(conn, ~p"/")
-    assert %{"nav.sign_in" => "Sign in"} = inertia_props(first).translations
-    version = inertia_props(first).i18nVersion
+  test "robots repeats every private SPA path in each public crawler group", %{conn: conn} do
+    result = get(conn, ~p"/robots.txt")
+    body = response(result, 200)
+    assert get_resp_header(result, "content-type") == ["text/plain; charset=utf-8"]
+    groups = String.split(body, "\n\n")
 
-    again = conn |> inertia() |> put_req_header("x-i18n", "en:#{version}") |> get(~p"/")
-    refute Map.has_key?(json_response(again, 200)["props"], "translations")
-  end
+    for agent <-
+          ~w(* Googlebot Bingbot OAI-SearchBot ChatGPT-User Claude-SearchBot Claude-User PerplexityBot Perplexity-User GPTBot ClaudeBot Google-Extended CCBot) do
+      group = Enum.find(groups, &String.starts_with?(&1, "User-agent: #{agent}\n"))
+      assert group =~ "Allow: /\n"
 
-  test "security headers", %{conn: conn} do
-    conn = get(conn, ~p"/")
-    [csp] = get_resp_header(conn, "content-security-policy")
-    assert csp =~ "frame-ancestors 'none'"
-    assert csp =~ "script-src 'self' 'nonce-"
-  end
-
-  describe "anonymous public pages are cookie-free and cacheable" do
-    test "no cookie, no CSRF token, a public Cache-Control and an ETag", %{conn: conn} do
-      first = get(conn, ~p"/")
-      html = html_response(first, 200)
-
-      assert get_resp_header(first, "set-cookie") == []
-      assert first.resp_cookies == %{}
-      refute html =~ "csrf-token"
-      assert get_resp_header(first, "cache-control") == ["public, max-age=0, must-revalidate"]
-      assert get_resp_header(first, "vary") == ["X-Inertia, Cookie"]
-      assert [~s(W/") <> _ = etag] = get_resp_header(first, "etag")
-
-      not_modified = conn |> put_req_header("if-none-match", etag) |> get(~p"/")
-      assert response(not_modified, 304) == ""
-      assert get_resp_header(not_modified, "set-cookie") == []
-
-      # Another URL is another page (and another language).
-      spanish = conn |> put_req_header("if-none-match", etag) |> get(~p"/es")
-      assert html_response(spanish, 200)
-      assert get_resp_header(spanish, "etag") != [etag]
+      for private <-
+            ~w(/admin /api /dashboard /onboarding /settings /session /registration /magic-links /invitations /auth /email-subscriptions /sudo/new /session/check-your-email /errors/403 /errors/404 /errors/500),
+          do: assert("Disallow: #{private}" in String.split(group, "\n"))
     end
 
-    test "the URL alone decides the language", %{conn: conn} do
-      conn = conn |> put_req_header("accept-language", "es") |> get(~p"/")
-      assert inertia_props(conn).locale == "en"
-      assert html_response(conn, 200) =~ ~s(<html lang="en")
-    end
+    assert String.ends_with?(body, "Sitemap: https://app.example.com/sitemap.xml\n")
+  end
 
-    test "an Inertia visit is not cached and still sets no cookie", %{conn: conn} do
-      conn = conn |> inertia() |> get(~p"/")
-      assert get_resp_header(conn, "cache-control") == ["private, no-store"]
-      assert get_resp_header(conn, "etag") == []
-      assert get_resp_header(conn, "set-cookie") == []
-      assert inertia_props(conn).auth == nil
-    end
+  test "indexing lock gives an empty sitemap and robots disallow-all with the public sitemap", %{
+    conn: conn
+  } do
+    put_flag(:site_indexing, false)
+    result = get(conn, ~p"/sitemap.xml")
+    refute response(result, 200) =~ "<url>"
+    assert get_resp_header(result, "x-robots-tag") == ["noindex, nofollow"]
+    result = get(conn, ~p"/robots.txt")
 
-    test "a signed-in visitor gets a personal, uncached page", %{conn: conn} do
-      user = user_fixture()
-      conn = conn |> log_in_user(user) |> get(~p"/")
-      assert html_response(conn, 200) =~ "csrf-token"
-      assert inertia_props(conn).auth.user["email"] == user.email
-      assert get_resp_header(conn, "cache-control") == ["private, no-store"]
-      assert get_resp_header(conn, "etag") == []
-    end
+    assert response(result, 200) ==
+             "User-agent: *\nDisallow: /\n\nSitemap: https://app.example.com/sitemap.xml\n"
 
-    test "form pages keep the session and the CSRF token", %{conn: conn} do
-      conn = conn |> log_in_user(user_fixture()) |> get(~p"/settings/appearance/edit")
-      assert html_response(conn, 200) =~ "csrf-token"
-      assert Map.has_key?(conn.resp_cookies, "XSRF-TOKEN")
-      assert Map.has_key?(conn.resp_cookies, "_starter_kit_key")
-    end
+    assert get_resp_header(result, "x-robots-tag") == ["noindex, nofollow"]
+  end
+
+  test "canonical host remains active for crawler infrastructure", %{conn: conn} do
+    previous = Application.get_env(:starter_kit, :canonical_host)
+    Application.put_env(:starter_kit, :canonical_host, "api.example.com")
+    on_exit(fn -> Application.put_env(:starter_kit, :canonical_host, previous) end)
+    assert redirected_to(get(conn, ~p"/sitemap.xml"), 301) =~ "/sitemap.xml"
   end
 end

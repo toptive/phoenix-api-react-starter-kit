@@ -12,10 +12,12 @@ defmodule StarterKitWeb.RobotsController do
 
   @search ~w(Googlebot Bingbot OAI-SearchBot ChatGPT-User Claude-SearchBot Claude-User PerplexityBot Perplexity-User)
   @training ~w(GPTBot ClaudeBot Google-Extended CCBot)
-  @private ~w(/admin /api /dashboard /onboarding /settings /session /registration /magic-links /invitations /auth /email-subscriptions)
+  @private ~w(/admin /api /dashboard /onboarding /settings /session /registration /magic-links /invitations /auth /email-subscriptions /sudo/new /session/check-your-email /errors/403 /errors/404 /errors/500)
 
   def show(conn, _params) do
-    body = if SiteIndexing.enabled?(), do: indexed(), else: "User-agent: *\nDisallow: /\n"
+    body =
+      if(SiteIndexing.enabled?(), do: indexed(), else: "User-agent: *\nDisallow: /\n") <>
+        "\nSitemap: #{StarterKitWeb.SEO.url("/sitemap.xml")}\n"
 
     conn |> skip_authorization() |> put_resp_content_type("text/plain") |> send_resp(200, body)
   end
@@ -27,7 +29,7 @@ defmodule StarterKitWeb.RobotsController do
       Enum.map(["*" | @search], &group(&1, true)) ++
         Enum.map(@training, &group(&1, &1 in allowed_training))
 
-    Enum.join(groups, "\n") <> "\nSitemap: #{url(~p"/sitemap.xml")}\n"
+    Enum.join(groups, "\n")
   end
 
   defp group(agent, true),

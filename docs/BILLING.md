@@ -5,8 +5,8 @@ new product; turn it on only when the product sells something.
 
 What exists today: server-owned offers, the Checkout session, signed webhooks with
 reconciliation, plans and limits (`plan/1`, `limit/2`, `with_capacity/4`) read from the
-stored subscription, the customer portal, renewal notices, a boot check, the billing page
-(`/settings/billing`) and the deploy switch with its guard (`config/deploy.yml`).
+stored subscription, the customer portal, renewal notices, a boot check, the billing API
+(`/api/v1/settings/billing`) and the deploy switch with its guard (`config/deploy.yml`).
 
 ## Rules
 
@@ -119,37 +119,50 @@ runs daily at 08:00 UTC (Oban Cron) and calls `Billing.send_renewal_notices/0`:
   Stripe. A failed preview claims nothing and is retried the next day while the window lasts.
 - It does not depend on `BILLING_ENABLED`: customers who already pay still renew.
 
-## Billing page
+## API and SPA flow
 
-`GET /settings/billing` (`Settings.BillingController`, `pages/settings/billing/show.tsx`), in
-the settings menu under the organization while `BILLING_ENABLED=true` (the `:billing` flag,
-shared prop `flags.billing`). With billing OFF it answers 404, unless the organization has a subscription:
-then the page stays reachable (the renewal email links to it) so the customer can cancel.
+All billing API routes use bearer authentication and the standard envelopes. Offers and
+subscriptions pass through typelizer serializers; Stripe ids never reach the SPA.
 
-- **Current plan**: the plan name and one sentence about what happens next: renews on a
-  date, ends on a date, payment failed (update the card), paused, or ended.
-- **Manage payments**: the portal button, shown to owners and admins whenever a
-  subscription exists (paid or not).
-- **Offer cards** (radio cards, never a `<select>`), only while the organization has no paid
-  plan. Each card: plan, interval, the exact price (`formatMoney`) and
-  `billing.plan_summary.<plan>`. Under the cards: ONE accept box (`billing.accept`: terms,
-  privacy, "I agree to pay {{price}} {{period}} until I cancel"), the pay button with the
-  price, and `billing.price_note`. The form posts the offer id, the offer revision of the
-  page and the box; the server checks all three again.
-- **Who can pay** (`Billing.sales/1`): `:open` in live mode; `:test` for operators in test
-  mode (a "Test mode" banner); `:closed` for everyone else ("Paid plans are not available
-  yet"). Members see the plan and the prices but not the button.
-- A paid organization cannot start a second checkout (`:already_subscribed`); it changes
-  or cancels its plan in the portal.
-- Stripe sends the customer back to `/settings/billing?checkout=done`. Until the webhook
-  arrives, the page says the payment is being confirmed, with a "Check again" button
-  (`router.reload()`); then "Your new plan is active". Cancel returns to the plain page.
-- Product copy: one `billing.plan.<plan>` and one `billing.plan_summary.<plan>` per plan,
-  one `billing.interval.<interval>` and `billing.per.<interval>` per interval.
+| Method | Endpoint | Result |
+|---|---|---|
+| GET | `/api/v1/settings/billing` | `BillingOverview`, organization member |
+| POST | `/api/v1/settings/billing/checkout-session` | 201 `RedirectUrl { url }`, manager |
+| POST | `/api/v1/settings/billing/portal-session` | 201 `RedirectUrl { url }`, manager |
+| POST | `/webhooks/stripe/events` | 200 `{ received: true }`, signed raw body |
+
+`BillingOverview` carries `plan`, nullable `subscription`, configured `offers`,
+`offerRevision`, `sales { status, testMode }`, and `canManage`. Sales status is `open` in
+live mode, `test` for test operators, or `closed`. `testMode` describes the deployment
+mode even when sales are closed. A manager is an owner/admin with full access; other
+members can read the overview. An organization with an existing subscription can read
+it and open the portal while the billing flag is off.
+
+Checkout accepts flat `offerId`, `offerRevision`, and `accepted` (true or `"true"`). The
+context checks, in order: billing enabled, key of the mode, test operator, no paid plan,
+known offer, current revision, payment acceptance, configured price id, then Stripe's
+active price, amount, currency, recurring interval and mode. Refusals are 404 `not_found`,
+503 `stripe_unavailable`, 403 `test_mode`, 409 `already_subscribed`, or 422
+`offer_changed`, `not_accepted`, `price_mismatch`. The stable code and translated message
+never expose Stripe's error details.
+
+The API returns the hosted destination in `url`; the SPA navigates there. Both checkout
+return URLs and the portal return URL use `PUBLIC_URL` (defaults to `SPA_ORIGIN`), including
+on a separate API host. Success returns to `/settings/billing?checkout=done`, cancel and
+portal to `/settings/billing`. The SPA polls the overview until `subscription.paid` becomes
+true. Request bodies cannot select a different organization.
+
+Audit actions: `billing.checkout_started`, `billing.portal_opened`,
+`billing.subscription_changed`. Checkout tracks `checkout_started`; reconciliation tracks
+anonymous `subscription_started` and `subscription_canceled` only when paid state changes.
+The signed webhook is rate limited to 600 requests/minute per client IP. Raw body bytes are
+retained by `Plugs.RawBody`; signature checks use HMAC-SHA256, constant-time comparison and
+five-minute tolerance. A repeated event id in the same mode is a 200 no-op. Without an
+endpoint secret the webhook returns 404, independently of the sales flag.
 
 ## Customer portal
 
-`POST /settings/billing/portal-session` → `Billing.create_portal_session/2` → Stripe's
+`POST /api/v1/settings/billing/portal-session` → `Billing.create_portal_session/2` → Stripe's
 hosted portal (card, invoices, cancel), back to the app afterwards. Configure the portal in
 the Stripe dashboard (Settings → Billing → Customer portal): allow cancellation at period
 end, allow card updates, show invoices. Do not allow plan switching there unless the
@@ -207,14 +220,12 @@ Steps:
    `billing_test_operator_user_ids` and the test price ids. In `.kamal/secrets`, uncomment
    the two `STRIPE_TEST_` lines:
 
-   ```sh
-   STRIPE_TEST_SECRET_KEY=$(cred get <app>/STRIPE_TEST_SECRET_KEY | tr -d '[:space:]')
-   STRIPE_TEST_WEBHOOK_SECRET=$(cred get <app>/STRIPE_TEST_WEBHOOK_SECRET | tr -d '[:space:]')
-   ```
+   Use `cred env <app>/STRIPE_TEST_SECRET_KEY --file .env` and the matching webhook
+   secret for local development. Deployment secrets must be injected through the approved
+   credential workflow in [DEPLOY.md](DEPLOY.md).
 
-   `tr` removes the newline a keychain value can carry (it breaks a key). `bin/rename`
-   writes the app name in these lines. Deploy, pay with a Stripe test card
-   (`4242 4242 4242 4242`), and check that the plan shows on `/settings/billing`.
+   Deploy, pay with Stripe's test card (`4242 4242 4242 4242`), and check the overview
+   from `/settings/billing`.
 2. **Live.** Set `billing = "live"` and the live price ids, uncomment the two `STRIPE_LIVE_`
    lines, and clear the operator ids. Deploy.
 3. **Renewal notices.** Set `billing_renewal_notices = true` once yearly offers are sold.
@@ -235,20 +246,6 @@ gates, so the Stripe keys never reach a test.
    dashboard too.
 4. Promotion codes are created in Stripe; the checkout accepts them
    (`allow_promotion_codes`, and no card is needed for a 100 % code).
-
-## Flow
-
-```
-/settings/billing (offer cards, "I accept" box, offer revision)
-  → POST /settings/billing/checkout-session  checkout[offerId, offerRevision, accepted]
-  → Billing.create_checkout_session/3: enabled, key of the mode, operator (test mode),
-    no paid plan yet, known offer, same revision, accepted, price id, Stripe price == offer
-  → Stripe POST /v1/checkout/sessions (idempotency key per org/user/offer/hour)
-  → audit "billing.checkout_started" → redirect to checkout.stripe.com (Inertia: 409)
-  → back to /settings/billing?checkout=done (cancel: /settings/billing)
-Stripe → POST /webhooks/stripe/events → Billing.receive_event/2 (signature, livemode)
-POST /settings/billing/portal-session → Billing.create_portal_session/2 → billing.stripe.com
-```
 
 ## Tests
 

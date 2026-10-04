@@ -72,38 +72,17 @@ defmodule StarterKit.FrontendRulesTest do
            "pages no controller renders"
   end
 
-  # Tests render without SSR, so a render_public page the SSR bundle cannot resolve fails only
-  # in production ("Page is not public" -> HTTP 500; whvisas 2026-10-02). The SSR entry resolves
-  # pages through its own import.meta.glob or through the shared resolver in assets/js/inertia.tsx.
-  test "every render_public page is reachable by the SSR page glob" do
-    ssr = File.read!("assets/js/ssr.tsx")
-    resolver = if ssr =~ ~s(from "@/inertia"), do: File.read!("assets/js/inertia.tsx"), else: ""
+  test "public API infrastructure has no Inertia caching, SSR or server page views" do
+    source = File.read!("lib/starter_kit_web/router.ex")
+    refute source =~ "Plugs.PublicPage"
+    refute source =~ "Plugs.PageViews"
+    refute File.read!("lib/starter_kit/application.ex") =~ "Inertia.SSR"
+    refute File.read!("lib/starter_kit_web/responses.ex") =~ "render_public"
 
-    globs =
-      for [_, args] <- Regex.scan(~r/import\.meta\.glob(?:<[^>]*>)?\(([^)]*)\)/s, ssr <> resolver),
-          [_, glob] <- Regex.scan(~r/"([^"]+)"/, args),
-          do: glob_regex(glob)
-
-    public =
-      for path <- Path.wildcard("lib/starter_kit_web/**/*.ex"),
-          [_, page] <- Regex.scan(~r/render_public\([^"]*"([a-z0-9\/-]+)"/, File.read!(path)),
-          uniq: true,
-          do: page
-
-    assert globs != [], "no import.meta.glob found for the SSR entry"
-    assert public != []
-
-    missing =
-      Enum.reject(public, fn page -> Enum.any?(globs, &Regex.match?(&1, "./pages/#{page}.tsx")) end)
-
-    assert missing == [], "render_public pages missing from the SSR glob: #{inspect(missing)}"
-  end
-
-  defp glob_regex(glob) do
-    glob
-    |> Regex.escape()
-    |> String.replace("\\*\\*/", "(?:.*/)?")
-    |> String.replace("\\*", "[^/]*")
-    |> then(&Regex.compile!("\\A" <> &1 <> "\\z"))
+    for name <- ~w(health sitemap robots) do
+      controller = File.read!("lib/starter_kit_web/controllers/#{name}_controller.ex")
+      refute controller =~ "Inertia"
+      refute controller =~ "render_public"
+    end
   end
 end

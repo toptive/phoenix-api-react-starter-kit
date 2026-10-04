@@ -9,8 +9,6 @@ defmodule StarterKitWeb.Plugs.Locale do
     5. `Accept-Language`;
     6. the default locale (first CSV column).
 
-  An anonymous public page (`Plugs.PublicPage`) skips 2–5: the URL alone decides the
-  language, so one URL is one cacheable page (`/` is the default locale, `/es` Spanish).
   """
 
   @behaviour Plug
@@ -23,10 +21,6 @@ defmodule StarterKitWeb.Plugs.Locale do
   def init(opts), do: opts
 
   @impl true
-  def call(%{assigns: %{public_anonymous: true}} = conn, _opts) do
-    assign(conn, :locale, conn.assigns[:path_locale] || I18n.default_locale())
-  end
-
   def call(conn, _opts) do
     query = I18n.supported_locale(conn.params["locale"])
     conn = if query, do: put_session(conn, :locale, query), else: conn

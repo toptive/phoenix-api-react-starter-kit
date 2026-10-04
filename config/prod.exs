@@ -1,6 +1,6 @@
 import Config
 
-config :starter_kit, ssr: true, hsts: true, secure_cookies: true
+config :starter_kit, hsts: true, secure_cookies: true
 
 # A flag ON with a wrong setup (billing: a missing key or price id, a key of the other
 # mode…) stops the boot instead of failing at the first customer.

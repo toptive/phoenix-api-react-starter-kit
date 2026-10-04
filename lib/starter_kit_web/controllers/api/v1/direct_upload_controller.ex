@@ -2,16 +2,18 @@ defmodule StarterKitWeb.Api.V1.DirectUploadController do
   @moduledoc "Signs a direct upload to object storage (see `StarterKit.Uploads`)."
   use StarterKitWeb, :controller
 
-  alias StarterKit.Accounts.Scope
   alias StarterKit.Organizations.Organization
   alias StarterKit.Uploads
 
   plug StarterKitWeb.Plugs.RateLimit, bucket: "uploads", limit: 60, period: 60_000
 
-  def create(conn, %{"direct_upload" => params}) do
+  def create(conn, params) do
     conn = authorize!(conn, :show, scope(conn).organization || Organization)
 
-    case Uploads.presign(Scope.organization_id(scope(conn)), params) do
+    case Uploads.presign(
+           scope(conn),
+           Map.take(params, ["filename", "content_type", "byte_size", "kind"])
+         ) do
       {:ok, upload} ->
         conn |> put_status(201) |> render_data({Serializers.DirectUploadSerializer, upload})
 

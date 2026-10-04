@@ -8,7 +8,7 @@ defmodule StarterKitWeb.SiteIndexingTest do
     assert robots =~ "User-agent: *\nAllow: /\nDisallow: /admin\n"
     assert robots =~ "User-agent: OAI-SearchBot\nAllow: /\n"
     assert robots =~ "User-agent: GPTBot\nAllow: /\n"
-    assert robots =~ "Sitemap: http://localhost:4002/sitemap.xml"
+    assert robots =~ "Sitemap: http://localhost:5173/sitemap.xml"
 
     Application.put_env(:starter_kit, :allowed_training_bots, ~w(ClaudeBot))
     on_exit(fn -> Application.delete_env(:starter_kit, :allowed_training_bots) end)
@@ -35,7 +35,8 @@ defmodule StarterKitWeb.SiteIndexingTest do
     assert html_response(not_found, 404)
     assert get_resp_header(not_found, "x-robots-tag") == ["noindex, nofollow"]
 
-    assert conn |> get(~p"/robots.txt") |> response(200) == "User-agent: *\nDisallow: /\n"
+    assert conn |> get(~p"/robots.txt") |> response(200) ==
+             "User-agent: *\nDisallow: /\n\nSitemap: http://localhost:5173/sitemap.xml\n"
 
     sitemap = conn |> get(~p"/sitemap.xml") |> response(200)
     refute sitemap =~ "<url>"

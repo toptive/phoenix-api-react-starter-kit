@@ -37,6 +37,9 @@ defmodule StarterKitWeb.Plugs.ErrorResponses do
     register_before_send(conn, &mark_error/1)
   end
 
+  defp mark_error(%Plug.Conn{request_path: "/health"} = conn),
+    do: put_resp_header(conn, "cache-control", "no-store")
+
   defp mark_error(%Plug.Conn{status: status} = conn) when is_integer(status) and status >= 400 do
     conn
     |> put_resp_header("x-robots-tag", "noindex")

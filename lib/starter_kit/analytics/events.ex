@@ -46,18 +46,6 @@ defmodule StarterKit.Analytics.Events do
     "invitation_sent" => %{origin: :server, props: %{role: ~w(owner admin member)}},
     "invitation_accepted" => %{origin: :server, props: %{}},
     # Traffic
-    "public_page_viewed" => %{
-      origin: :server,
-      props: %{
-        page_type: {:slug, 80},
-        locale: {:slug, 10},
-        path: {:path, 200},
-        referrer_domain: {:slug, 255},
-        utm_source: {:slug, 80},
-        utm_medium: {:slug, 80},
-        utm_campaign: {:slug, 80}
-      }
-    },
     "page_viewed" => %{origin: :client, props: %{page: {:slug, 80}}},
     "cta_clicked" => %{origin: :client, props: %{cta: {:slug, 40}, page: {:slug, 80}}}
   }

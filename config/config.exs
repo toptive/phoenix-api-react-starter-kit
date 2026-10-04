@@ -16,8 +16,6 @@ config :starter_kit,
   # Who may create an account (SIGNUP_MODE): :open — anyone; :invite — only an email
   # with an open invitation; :closed — nobody (existing users still sign in).
   signup_mode: :open,
-  ssr: false,
-  ssr_pool_size: 1,
   google_auth: false,
   spa_origin: "http://localhost:5173",
   cors_origins: ["http://localhost:5173"]

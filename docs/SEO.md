@@ -1,111 +1,67 @@
-# SEO
+# SEO and public infrastructure
 
-## Server-side rendering
+The React SPA owns the head for home and published legal pages: title, description,
+canonical, hreflang, Open Graph and JSON-LD. Prerendering is a frontend build concern.
+The API serves `/health`, `/sitemap.xml` and `/robots.txt` directly, without JSON envelopes,
+authentication, cookies or Inertia. Public Inertia caching and server page-view plugs have
+been removed. Canonical-host enforcement and the indexing lock remain in the endpoint.
 
-Public pages call `render_public/3`: `indexable` (no `noindex` meta) and SSR when
-`config :starter_kit, :ssr` is true (production). Inertia sends the page to a Node worker
-(`Inertia.SSR`, one worker by default) that runs `priv/ssr/ssr.js`; crawlers get complete HTML
-and the browser hydrates it. Pages behind sign-in render in the browser and are `noindex`.
+## Public origin and locales
 
-- **Hydration**: `app.tsx` hydrates when `#app` already has children (SSR) and renders from
-  scratch when it is empty (CSR). Inertia sets no marker attribute, so never test for one.
-- **The raw `<title>`**: Inertia moves the SSR `<title>` into the `page_title` assign, already
-  HTML-escaped by React. `Layouts.page_title/1` unescapes it before HEEx escapes it once
-  ("Terms &amp; privacy", never "&amp;amp;"); without SSR it is the app name.
-- `test/starter_kit_web/ssr_head_test.exs` builds the real SSR bundle and checks the raw head
-  of public pages per locale (one title, the page's own, escaped once; React markup in `#app`).
+`PUBLIC_URL` is the public SPA origin, defaulting to `SPA_ORIGIN`. Sitemap locations,
+alternates and the robots sitemap link use it rather than the API endpoint origin. `SEO.url/1`
+and `SEO.localized_path/2` centralize these mappings. English (the default locale) has no prefix:
+`/`, `/legal/terms`. Spanish uses `/es`, `/es/legal/terms`. Legal API content comes from
+`GET /api/v1/legal-pages/:slug` with the request locale and English fallback per field;
+the SPA renders plain text safely and constructs its head from this content.
 
-Dev: `SSR=1 mix phx.server` rebuilds the SSR bundle on change and renders public pages on the server.
+## Sitemap
 
-## Cookie-free, cacheable public pages
+`GET /sitemap.xml` returns `application/xml`, listing home plus published legal slugs
+(`terms`, `privacy`, `cookies`) in every supported CSV locale. Each location includes
+`xhtml:link` alternates for every locale. Draft and unpublished documents are excluded.
+The public base URL is XML-escaped. A product adding public pages extends the sitemap path
+list. When origins differ, the SPA web server proxies `/sitemap.xml` and `/robots.txt` to
+the API so crawler discovery still works on the public host.
 
-Public routes pipe through `[:public, :browser]`. `Plugs.PublicPage` treats a request with no
-`Cookie` and no `Authorization` header as anonymous:
+## Robots
 
-- **No cookie.** The response drops the session cookie and Inertia's `XSRF-TOKEN`, and the root
-  layout leaves out the `csrf-token` meta. A visitor from search or an ad gets no cookie until
-  they open a form page (sign-in, sign-up): those keep the session and the CSRF token as usual.
-- **One URL, one page.** Nobody is signed in, the flash is empty and the locale comes from the
-  path only (`Plugs.Locale` skips `?locale=`, the session and `Accept-Language`).
-- **Validators before SSR.** `render_public/3` sets a weak `ETag` (page and shared props, asset
-  version, date), `cache-control: public, max-age=0, must-revalidate` and
-  `vary: X-Inertia, Cookie`. A matching `If-None-Match` gets `304` with no render.
+`GET /robots.txt` returns `text/plain`. One group for `*` and each search/AI-answer bot
+(`Googlebot`, `Bingbot`, `OAI-SearchBot`, `ChatGPT-User`, `Claude-SearchBot`, `Claude-User`,
+`PerplexityBot`, `Perplexity-User`) allows public pages and repeats all private paths:
 
-A request with a cookie (a signed-in user, or anyone who opened a form page) runs the normal
-browser chain and gets `private, no-store`, so personal pages never reach a shared cache. Inertia
-visits (`X-Inertia`) are `private, no-store` too. The CSP nonce is per response; if a product
-lets a CDN keep the HTML (`s-maxage`), the cached nonce is shared by every visitor of that copy.
-A public page must therefore never render user input.
+```text
+/admin /api /dashboard /onboarding /settings /session /registration /magic-links
+/invitations /auth /email-subscriptions /sudo/new /session/check-your-email
+/errors/403 /errors/404 /errors/500
+```
 
-## Per-page tags
-
-`StarterKitWeb.SEO.build(conn, path:, title:, description:, image:, json_ld:)` → `seo` prop →
-`<Seo>` renders title, description, canonical, `hreflang` alternates (+ `x-default`), Open Graph,
-Twitter card and JSON-LD blocks inside Inertia's `<Head>`. Helpers: `SEO.organization_json_ld/0`,
-`SEO.website_json_ld/1`, `SEO.breadcrumb_json_ld(conn, [{name, path}])` (home first, unlocalized
-paths; legal pages use it). `jsonLdText` in `seo.tsx` writes `<` as `\u003c`, so no value can
-close the script tag (`ssr_head_test.exs` checks the real SSR HTML). Default share image: one card per locale,
-`priv/static/images/og-<locale>.png` (1200×630, < 150 KB), picked by `SEO.default_image/1`.
-
-## Social cards and icons
-
-- `bin/og-cards.mjs` renders the cards from the product itself: `theme.css` colours and font,
-  `favicon.svg`, and the `app.name` + `og.tagline` keys of each locale. Run it after a rename,
-  a re-skin or a copy change: `PLAYWRIGHT_MODULE=…/node_modules/playwright bin/og-cards.mjs`
-  (needs any Playwright install and ImageMagick).
-- `bin/icons` builds `favicon.ico`, `apple-touch-icon.png` and `icon-192/512.png` (listed in
-  `site.webmanifest`) from `favicon.svg` (needs `rsvg-convert` and ImageMagick).
-- Error responses (status ≥ 400, the last-resort pages too) carry `x-robots-tag: noindex` and
-  `cache-control: private, no-store` (`Plugs.ErrorResponses`).
-
-## Launch safety
-
-`test/starter_kit_web/placeholder_test.exs` fails while a product still ships a template
-placeholder: the template name, a `CHANGE_ME`/`example.com` host or sender in `config/deploy.yml`,
-the template favicon, icons or social cards (by fingerprint), or Phoenix default copy. In the
-template itself (the `.template-repo` marker, deleted by `bin/rename`) these checks are skipped;
-a template-only test keeps the recorded fingerprints current. After you change a template brand
-file, update its fingerprint in the test.
-
-## Localized URLs
-
-Default locale at `/…`, others at `/:locale/…` (one router scope, last in the router).
-`Plugs.PathLocale` answers 404 for an unknown locale and 301-redirects the default locale
-(`/en/legal/terms` → `/legal/terms`), so every page has one canonical URL. On the server,
-`SEO.localized_path/2` maps a path to a locale; in React, `usePublicRoutes()` picks the
-unprefixed or the `localized*` route helper, and the `:locale` param comes from typelizer URL
-defaults (`setUrlDefaults` in `app.tsx` and `ssr.tsx`).
-
-## sitemap.xml and robots.txt
-
-`/sitemap.xml` lists every public page in every locale with `xhtml:link` alternates (home + the
-published legal pages; add product pages in `SitemapController`). `/robots.txt` allows public
-pages, disallows the app, admin and API, and points to the sitemap.
-
-robots.txt has one group for `*` and one per search or AI-answer crawler (`Googlebot`, `Bingbot`,
-`OAI-SearchBot`, `ChatGPT-User`, `Claude-SearchBot`, `Claude-User`, `PerplexityBot`,
-`Perplexity-User`): a bot obeys only its own group, so each one repeats the private paths.
-AI-training crawlers (`GPTBot`, `ClaudeBot`, `Google-Extended`, `CCBot`) are allowed only when
-listed in `config :starter_kit, :allowed_training_bots` (all of them by default); remove one to
-send it `Disallow: /`. Add a private path to `@private` in `RobotsController`.
-
-## Canonical host
-
-`Plugs.CanonicalHost` (in the endpoint) sends every request on another host (`www.`, the server
-IP, an old domain) to `PHX_HOST` with the same path and query: 301 for GET and HEAD, 308 for
-other methods. `/health` is never redirected (kamal-proxy checks it on the container address).
-It is on only when `config :starter_kit, :canonical_host` is set (production `runtime.exs`).
-kamal-proxy routes only the hosts in `proxy.host`/`proxy.hosts`: to redirect `www.`, add it there.
+AI-training bots (`GPTBot`, `ClaudeBot`, `Google-Extended`, `CCBot`) get individual groups;
+only bots listed in `allowed_training_bots` are allowed (all four by default). Removed bots
+get `Disallow: /`. Both open and locked robots responses end with
+`Sitemap: <PUBLIC_URL>/sitemap.xml`.
 
 ## Indexing lock
 
-`SITE_INDEXING` (the `:site_indexing` flag, `StarterKit.Flags`) is `0` by default in production and `1`
-elsewhere. While it is `0`, `Plugs.SiteIndexing` (in the endpoint) adds
-`x-robots-tag: noindex, nofollow` to every response, static files and errors too; the root layout
-adds `<meta name="robots" content="noindex">` to every page; robots.txt is
-`Disallow: /` and the sitemap is empty. Set `SITE_INDEXING: "1"` in `config/deploy.yml` on launch
-day. A staging or preview deploy keeps it at `0`.
+`SITE_INDEXING` controls the private `site_indexing` flag: off in production until launch,
+on elsewhere. While off, `Plugs.SiteIndexing` adds `X-Robots-Tag: noindex, nofollow` to every
+response, including static files and errors; robots disallows everything and sitemap has
+an empty `urlset`. The SPA's head must also respect its deployment's indexing policy.
+Set `SITE_INDEXING=1` on launch; previews and staging keep it off. Error responses are always
+noindex and uncacheable (`Plugs.ErrorResponses`).
 
-## Performance
+## Canonical API host and health
 
-Lighthouse on the landing (production image): see [PERFORMANCE.md](PERFORMANCE.md).
+`Plugs.CanonicalHost` redirects other hosts to the configured API endpoint host, retaining
+the path and query: 301 for GET/HEAD, 308 for writes. It is configured by `PHX_HOST` in
+production. `/health` bypasses this rule so the deployment proxy can probe the container.
+Health returns text `ok` (200) or `database unavailable` (503), always `Cache-Control: no-store`.
+The DB check is `SELECT 1` with a two-second timeout.
+
+## Branding and launch checks
+
+`bin/og-cards.mjs` creates per-locale cards from theme colours, fonts, logo and CSV copy;
+`bin/icons` generates application icons from the favicon. Placeholder checks under
+`test/starter_kit_web/placeholder_test.exs` are skipped for `.template-repo`, then enforce
+product branding after `bin/rename`. Landing performance targets and tuning are described
+in [PERFORMANCE.md](PERFORMANCE.md).

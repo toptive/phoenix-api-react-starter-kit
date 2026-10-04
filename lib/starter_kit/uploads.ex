@@ -12,8 +12,9 @@ defmodule StarterKit.Uploads do
   Config: `S3_BUCKET`, `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`.
   """
 
-  use Boundary, top_level?: true, deps: [], exports: []
+  use Boundary, top_level?: true, deps: [StarterKit.Accounts], exports: []
 
+  alias StarterKit.Accounts.Scope
   alias StarterKit.Uploads.UploadGuard
 
   @put_expiry 600
@@ -25,16 +26,18 @@ defmodule StarterKit.Uploads do
   @doc """
   Signs an upload for `owner_prefix` (usually the organization id).
   `params`: `filename`, `content_type`, `byte_size`, `kind`.
-  Returns `{:ok, %{url, key, method, headers}}` or `{:error, reason}`.
+  Returns `{:ok, %{url, key, headers, expires_at}}` or `{:error, reason}`.
   """
+  def presign(%Scope{} = scope, params),
+    do: presign(Scope.organization_id(scope), params)
+
   def presign(owner_prefix, %{
         "filename" => filename,
         "content_type" => type,
         "byte_size" => size,
         "kind" => kind
-      }) do
-    size = if is_binary(size), do: String.to_integer(size), else: size
-
+      })
+      when is_binary(filename) and is_binary(type) and is_binary(kind) do
     with :ok <- UploadGuard.check(kind, type, size),
          {:ok, bucket} <- bucket() do
       key = "uploads/#{owner_prefix}/#{Ecto.UUID.generate()}/#{UploadGuard.safe_filename(filename)}"
@@ -46,7 +49,13 @@ defmodule StarterKit.Uploads do
           headers: [{"content-type", type}]
         )
 
-      {:ok, %{url: url, key: key, method: "PUT", headers: %{"content-type" => type}}}
+      {:ok,
+       %{
+         url: url,
+         key: key,
+         expires_at: DateTime.add(DateTime.utc_now(:second), @put_expiry),
+         headers: %{"content-type" => type}
+       }}
     end
   rescue
     ArgumentError -> {:error, :invalid_size}
@@ -57,17 +66,33 @@ defmodule StarterKit.Uploads do
   @doc "Checks a stored object: it exists, fits the size cap, and its bytes match `kind`."
   def verify(key, kind) do
     with {:ok, bucket} <- bucket(),
-         {:ok, %{headers: headers}} <- bucket |> ExAws.S3.head_object(key) |> ExAws.request(),
-         size = headers |> header("content-length") |> String.to_integer(),
+         {:ok, %{headers: headers}} <- bucket |> ExAws.S3.head_object(key) |> storage_request(),
+         {size, ""} <- Integer.parse(header(headers, "content-length")),
+         true <- size > 0,
          :ok <- size_ok(kind, size),
          {:ok, %{body: head}} <-
-           bucket |> ExAws.S3.get_object(key, range: "bytes=0-15") |> ExAws.request(),
-         true <- UploadGuard.bytes_allowed?(kind, head) || {:error, :content_type_not_allowed} do
+           bucket |> ExAws.S3.get_object(key, range: "bytes=0-15") |> storage_request(),
+         true <- UploadGuard.bytes_allowed?(kind, head) do
       :ok
     else
-      {:error, _} = error -> error
-      _ -> {:error, :not_found}
+      _ -> {:error, :upload_incomplete}
     end
+  end
+
+  @doc "Verifies ownership as well as stored bytes before a tenant context saves a key."
+  def verify(%Scope{} = scope, key, kind) when is_binary(key) do
+    prefix = "uploads/#{Scope.organization_id(scope)}/"
+
+    if String.starts_with?(key, prefix) and not String.contains?(key, ["..", "\\"]),
+      do: verify(key, kind),
+      else: {:error, :upload_incomplete}
+  end
+
+  def verify(_scope, _key, _kind), do: {:error, :upload_incomplete}
+
+  defp storage_request(operation) do
+    options = Application.get_env(:starter_kit, __MODULE__, [])[:request_options] || []
+    ExAws.request(operation, options)
   end
 
   @doc "A presigned GET URL for a private object."

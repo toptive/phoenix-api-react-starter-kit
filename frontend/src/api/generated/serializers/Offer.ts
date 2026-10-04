@@ -4,7 +4,7 @@
 export interface Offer {
   id: string;
   plan: string;
-  interval: string;
+  interval: "month" | "year";
   amountCents: number;
   currency: string;
 }

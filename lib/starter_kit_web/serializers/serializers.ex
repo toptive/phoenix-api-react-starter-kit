@@ -141,7 +141,7 @@ defmodule StarterKitWeb.Serializers.DirectUploadSerializer do
 
   attribute :url, type: :string
   attribute :key, type: :string
-  attribute :method, type: :string
+  attribute :expires_at, type: :utc_datetime
   attribute :headers, type: {:map, :string}
 end
 
@@ -161,7 +161,7 @@ defmodule StarterKitWeb.Serializers.OfferSerializer do
 
   attribute :id, type: :string
   attribute :plan, type: :string
-  attribute :interval, type: :string
+  attribute :interval, type: {:enum, ["month", "year"]}
   attribute :amount_cents, type: :integer
   attribute :currency, type: :string
 end

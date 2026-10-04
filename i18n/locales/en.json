@@ -554,5 +554,13 @@
   "errors.api.transfer_ownership": "Make someone else an owner before deleting your account.",
   "errors.api.subscription_active": "Cancel the paid plan before deleting your account.",
   "errors.api.ai_not_configured": "Text translation is not available yet.",
-  "errors.api.ai_unavailable": "Text translation is unavailable right now. Try again later."
+  "errors.api.ai_unavailable": "Text translation is unavailable right now. Try again later.",
+  "errors.api.offer_changed": "The price changed. Review the current offer and try again.",
+  "errors.api.not_accepted": "Accept the payment terms to continue.",
+  "errors.api.price_mismatch": "This price is unavailable. Please try again later.",
+  "errors.api.already_subscribed": "Your workspace already has a paid plan. Manage it in payments.",
+  "errors.api.no_subscription": "Your workspace has no subscription to manage.",
+  "errors.api.test_mode": "Payments are available to test operators only.",
+  "errors.api.stripe_unavailable": "Payments are unavailable. Please try again later.",
+  "errors.api.upload_incomplete": "This file could not be verified. Upload it again."
 }

@@ -554,5 +554,13 @@
   "errors.api.transfer_ownership": "Nombra a otra persona como dueña antes de eliminar tu cuenta.",
   "errors.api.subscription_active": "Cancela el plan de pago antes de eliminar tu cuenta.",
   "errors.api.ai_not_configured": "La traducción de textos todavía no está disponible.",
-  "errors.api.ai_unavailable": "La traducción de textos no está disponible ahora. Probá más tarde."
+  "errors.api.ai_unavailable": "La traducción de textos no está disponible ahora. Probá más tarde.",
+  "errors.api.offer_changed": "El precio cambió. Revisá la oferta actual y probá de nuevo.",
+  "errors.api.not_accepted": "Aceptá las condiciones de pago para continuar.",
+  "errors.api.price_mismatch": "Este precio no está disponible. Probá más tarde.",
+  "errors.api.already_subscribed": "Tu espacio ya tiene un plan pago. Administralo en pagos.",
+  "errors.api.no_subscription": "Tu espacio no tiene una suscripción para administrar.",
+  "errors.api.test_mode": "Los pagos están disponibles solo para operadores de prueba.",
+  "errors.api.stripe_unavailable": "Los pagos no están disponibles. Probá más tarde.",
+  "errors.api.upload_incomplete": "No se pudo verificar este archivo. Volvé a subirlo."
 }
