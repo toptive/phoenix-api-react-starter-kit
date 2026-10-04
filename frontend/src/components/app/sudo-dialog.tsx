@@ -96,9 +96,8 @@ function SudoForm({ onConfirmed }: { onConfirmed: () => void }) {
               await sudo.mutateAsync(input)
               onConfirmed()
             } catch (error) {
+              password.setValue("password", "")
               applyFormErrors(error, password.setError)
-            } finally {
-              password.resetField("password")
             }
           })}
         >
@@ -152,7 +151,6 @@ function SudoForm({ onConfirmed }: { onConfirmed: () => void }) {
                 )}
               </FormField>
               <FormError message={link.formState.errors.root?.message} />
-              <FormError error={sudo.error} />
               <Button disabled={sudo.isPending} type="submit">
                 {t("auth.sudo.confirm")}
               </Button>

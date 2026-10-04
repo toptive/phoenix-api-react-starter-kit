@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from "@tanstack/react-router"
 import { useTranslation } from "react-i18next"
 import { useInvitation, useAcceptInvitation } from "@/api/hooks/organizations"
+import { ApiError } from "@/api/http"
 import { useSignOut } from "@/api/hooks/auth"
 import { useAppConfig } from "@/api/hooks/bootstrap"
 import { AuthHeading } from "@/components/app/auth-card"
@@ -22,6 +23,8 @@ export default function InvitationShow() {
   const signOut = useSignOut()
   const back = paths.invitation(token)
   const invitation = preview.data
+  if (preview.error instanceof ApiError && preview.error.code === "invitation_invalid")
+    return <FormError message={t("errors.api.invitation_invalid")} />
   if (!invitation) return <QueryState pending={preview.isPending} error={preview.error} retry={preview.refetch} />
   return (
     <>
@@ -95,7 +98,10 @@ export default function InvitationShow() {
           <p className="text-sm text-muted-foreground">{t("invitation.guest_help", { email: invitation.email })}</p>
         </div>
       )}
-      <FormError error={accept.error ?? signOut.error} />
+      <FormError
+        message={accept.error instanceof ApiError && accept.error.code === "invitation_invalid" ? t("errors.api.invitation_invalid") : undefined}
+        error={accept.error ?? signOut.error}
+      />
     </>
   )
 }

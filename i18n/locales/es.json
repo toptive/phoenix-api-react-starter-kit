@@ -551,7 +551,7 @@
   "auth.session.forgot_help": "¿Olvidaste tu contraseña? Ingresá con un enlace por email y elegí una nueva en Configuración.",
   "common.retry": "Intentar de nuevo",
   "common.retry_help": "Intentá de nuevo para cargar esta página.",
-  "common.saved": "Guardado. Podés seguir usando tu cuenta.",
+  "common.saved": "Guardado. Tus cambios están listos.",
   "auth.sudo.title": "Confirmá que sos vos",
   "auth.sudo.dialog_lead": "Por tu seguridad, confirmá que sos vos. Después continuamos con tu cambio.",
   "auth.sudo.confirm": "Confirmar y continuar",
@@ -583,5 +583,9 @@
   "settings.members.empty_help": "Invitá a alguien para trabajar con vos en esta organización.",
   "settings.members.pending_empty_title": "No hay invitaciones pendientes",
   "settings.members.pending_empty_help": "Invitá a alguien y aparece acá hasta que se sume.",
-  "settings.members.unknown_person": "Persona de la organización"
+  "settings.members.unknown_person": "Persona de la organización",
+  "role.owner": "Dueño",
+  "role.admin": "Administrador",
+  "role.member": "Miembro",
+  "errors.api.invitation_invalid": "Esta invitación venció o ya fue usada. Pedí una nueva invitación."
 }

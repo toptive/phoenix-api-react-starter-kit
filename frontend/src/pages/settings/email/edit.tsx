@@ -1,3 +1,4 @@
+import { limits } from "@/schemas/limits"
 import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -50,7 +51,7 @@ export default function EmailEdit() {
           <FormField
             label={t("fields.new_email")}
             help={t("settings.email.help")}
-            error={fieldMessage(form.formState.errors.email?.message)}
+            error={fieldMessage(form.formState.errors.email?.message, { count: limits.emailMax })}
           >
             {(id, describedBy) => (
               <Input

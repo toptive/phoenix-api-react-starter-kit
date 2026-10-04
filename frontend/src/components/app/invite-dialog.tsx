@@ -1,3 +1,4 @@
+import { limits } from "@/schemas/limits"
 import { useState } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -87,7 +88,7 @@ function InviteForm({ onSent }: { onSent: () => void }) {
               <FormField
                 label={t("fields.email")}
                 help={t("settings.members.email_help")}
-                error={fieldMessage(form.formState.errors.email?.message)}
+                error={fieldMessage(form.formState.errors.email?.message, { count: limits.emailMax })}
               >
                 {(id, describedBy) => (
                   <Input
@@ -115,7 +116,7 @@ function InviteForm({ onSent }: { onSent: () => void }) {
                   <NativeSelect className="min-h-11" id={id} aria-describedby={describedBy} {...form.register("role")}>
                     {(["admin", "member"] as const).map((role) => (
                       <NativeSelectOption key={role} value={role}>
-                        {t(`level.${role}_full`)}
+                        {t(values.access === "viewer" ? `role.${role}` : `level.${role}_full`)}
                       </NativeSelectOption>
                     ))}
                   </NativeSelect>

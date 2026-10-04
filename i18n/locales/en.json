@@ -551,7 +551,7 @@
   "auth.session.forgot_help": "Forgot your password? Sign in with an email link, then set a new password in Settings.",
   "common.retry": "Try again",
   "common.retry_help": "Try again to reload this page.",
-  "common.saved": "Saved. You can keep using your account.",
+  "common.saved": "Saved. Your changes are ready.",
   "auth.sudo.title": "Confirm it’s you",
   "auth.sudo.dialog_lead": "For your security, confirm it’s you. Then we’ll continue your change.",
   "auth.sudo.confirm": "Confirm and continue",
@@ -583,5 +583,9 @@
   "settings.members.empty_help": "Invite someone to work with you in this organization.",
   "settings.members.pending_empty_title": "No invitations waiting",
   "settings.members.pending_empty_help": "Invite someone and they will appear here until they join.",
-  "settings.members.unknown_person": "Organization member"
+  "settings.members.unknown_person": "Organization member",
+  "role.owner": "Owner",
+  "role.admin": "Admin",
+  "role.member": "Member",
+  "errors.api.invitation_invalid": "This invitation has expired or was already used. Ask for a new invitation."
 }

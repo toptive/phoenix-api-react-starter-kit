@@ -2,7 +2,6 @@ import type { FieldValues, Path, UseFormSetError } from "react-hook-form"
 import { ApiError } from "@/api/http"
 import type { FieldError } from "@/api/generated/serializers"
 import { i18n } from "@/i18n"
-import { limits } from "@/schemas/limits"
 
 /** Server messages already include the requested locale and interpolation bindings. */
 export function validationMessages(details: Record<string, unknown>): Record<string, string> {
@@ -34,7 +33,7 @@ export function applyFormErrors<T extends FieldValues>(error: unknown, setError:
 /** Only client-side keys need translating here; server field messages pass through. */
 export const fieldMessage = (
   message?: string,
-  bindings: Record<string, string | number> = { count: limits.emailMax },
+  bindings: Record<string, string | number> = {},
 ) => (message ? i18n.t(message, { ...bindings, defaultValue: message }) : undefined)
 
 export const boundedFieldMessage = (message: string | undefined, minimum: number, maximum: number) =>

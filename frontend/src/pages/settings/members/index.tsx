@@ -1,7 +1,7 @@
 import { MailIcon, UsersIcon } from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
 import { useTranslation } from "react-i18next"
-import { useForm } from "react-hook-form"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import { useAppConfig } from "@/api/hooks/bootstrap"
@@ -183,6 +183,7 @@ function MembershipForm({ membership, owner, name }: { membership: Membership; o
     resolver: zodResolver(membershipSchema),
     defaultValues: { role: membership.role, access: membership.access },
   })
+  const access = useWatch({ control: form.control, name: "access" })
   return (
     <form
       noValidate
@@ -205,7 +206,7 @@ function MembershipForm({ membership, owner, name }: { membership: Membership; o
           <NativeSelect className="min-h-11" id={id} aria-describedby={describedBy} {...form.register("role")}>
             {(owner ? ["owner", "admin", "member"] : ["admin", "member"]).map((role) => (
               <NativeSelectOption key={role} value={role}>
-                {t(`level.${role}_full`)}
+                {t(access === "viewer" ? `role.${role}` : `level.${role}_full`)}
               </NativeSelectOption>
             ))}
           </NativeSelect>

@@ -1,3 +1,4 @@
+import { limits } from "@/schemas/limits"
 import { useNavigate, useSearch } from "@tanstack/react-router"
 import { useTranslation } from "react-i18next"
 import { useForm } from "react-hook-form"
@@ -80,7 +81,7 @@ function SignInForms() {
               }
             })}
           >
-            <FormField label={t("fields.email")} error={fieldMessage(password.formState.errors.email?.message)}>
+            <FormField label={t("fields.email")} error={fieldMessage(password.formState.errors.email?.message, { count: limits.emailMax })}>
               {(id, describedBy) => (
                 <Input
                   id={id}

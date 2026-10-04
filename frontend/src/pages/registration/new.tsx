@@ -104,7 +104,7 @@ export default function RegisterPage() {
               <FormField
                 label={t("fields.email")}
                 help={t("auth.registration.email_help")}
-                error={fieldMessage(form.formState.errors.email?.message)}
+                error={fieldMessage(form.formState.errors.email?.message, { count: limits.emailMax })}
               >
                 {(id, describedBy) => (
                   <Input

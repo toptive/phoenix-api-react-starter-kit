@@ -1,3 +1,4 @@
+import { limits } from "@/schemas/limits"
 import { useCallback, useState } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -44,7 +45,7 @@ export function MagicLinkForm({ email = "", onSent }: { email?: string; onSent?:
       <FormField
         label={t("fields.email")}
         help={t("auth.session.link_help")}
-        error={fieldMessage(form.formState.errors.email?.message)}
+        error={fieldMessage(form.formState.errors.email?.message, { count: limits.emailMax })}
       >
         {(id, describedBy) => (
           <Input id={id} aria-describedby={describedBy} type="email" autoComplete="email" {...form.register("email")} />
