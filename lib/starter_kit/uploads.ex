@@ -26,7 +26,7 @@ defmodule StarterKit.Uploads do
   @doc """
   Signs an upload for `owner_prefix` (usually the organization id).
   `params`: `filename`, `content_type`, `byte_size`, `kind`.
-  Returns `{:ok, %{url, key, headers, expires_at}}` or `{:error, reason}`.
+  Returns `{:ok, %{url, key, method, headers}}` or `{:error, reason}`.
   """
   def presign(%Scope{} = scope, params),
     do: presign(Scope.organization_id(scope), params)
@@ -53,7 +53,7 @@ defmodule StarterKit.Uploads do
        %{
          url: url,
          key: key,
-         expires_at: DateTime.add(DateTime.utc_now(:second), @put_expiry),
+         method: "PUT",
          headers: %{"content-type" => type}
        }}
     end

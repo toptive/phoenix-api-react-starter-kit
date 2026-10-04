@@ -249,7 +249,8 @@ defmodule StarterKit.Accounts.Sessions do
       from t in UserToken,
         where:
           (t.context == "magic_link" and t.inserted_at < ago(15, "minute")) or
-            (like(t.context, "change_email:%") and t.inserted_at < ago(7, "day"))
+            (like(t.context, "change_email:%") and t.inserted_at < ago(7, "day")) or
+            (t.context == "jobs_access" and t.inserted_at < ago(60, "second"))
     )
 
     Repo.delete_all(from i in Impersonation, where: i.ended_at < ago(90, "day"))

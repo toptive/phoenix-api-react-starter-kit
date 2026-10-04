@@ -94,7 +94,7 @@ defmodule StarterKitWeb.ApiBillingConfigTest do
     )
 
     current = json_response(get(auth, ~p"/api/v1/settings/billing"), 200)["data"]
-    assert current["sales"] == %{"status" => "open", "testMode" => false}
+    assert current["sales"] == "open"
     assert hd(current["offers"])["amountCents"] == 2900
     refute current["offerRevision"] == first["offerRevision"]
   end

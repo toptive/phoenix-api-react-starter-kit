@@ -132,7 +132,7 @@ subscriptions pass through typelizer serializers; Stripe ids never reach the SPA
 | POST | `/webhooks/stripe/events` | 200 `{ received: true }`, signed raw body |
 
 `BillingOverview` carries `plan`, nullable `subscription`, configured `offers`,
-`offerRevision`, `sales { status, testMode }`, and `canManage`. Sales status is `open` in
+`offerRevision`, `sales` (`"open" | "test" | "closed"`), and `canManage`. Sales status is `open` in
 live mode, `test` for test operators, or `closed`. `testMode` describes the deployment
 mode even when sales are closed. A manager is an owner/admin with full access; other
 members can read the overview. An organization with an existing subscription can read

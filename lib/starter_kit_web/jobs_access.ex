@@ -14,7 +14,13 @@ defmodule StarterKitWeb.JobsAccess do
   def create(scope) do
     with {:ok, payload} <- Accounts.create_jobs_ticket(scope) do
       ticket = Phoenix.Token.sign(Endpoint, "jobs-ticket", payload)
-      {:ok, %{url: Endpoint.url() <> "/admin/jobs/session?" <> URI.encode_query(%{ticket: ticket})}}
+
+      {:ok,
+       %{
+         url:
+           Application.fetch_env!(:starter_kit, :api_origin) <>
+             "/admin/jobs/session?" <> URI.encode_query(%{ticket: ticket})
+       }}
     end
   end
 

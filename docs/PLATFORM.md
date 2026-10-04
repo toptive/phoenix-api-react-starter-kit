@@ -199,3 +199,5 @@ ended impersonations more than 90 days ago). Workers delegate one context call. 
 is described in [ADMIN.md](ADMIN.md#oban-web).
 
 `PUBLIC_URL` (preferred) and `SPA_ORIGIN` (compatibility) select the public SPA origin. Machine one-click unsubscribe headers use `API_URL` / `API_ORIGIN`, defaulting to the configured Phoenix host and port; footer links remain on the SPA.
+
+Direct uploads return `{ url, key, method, headers }`; `method` is `"PUT"`. The presigned URL carries its ten-minute expiry. Header names retain their storage spelling.

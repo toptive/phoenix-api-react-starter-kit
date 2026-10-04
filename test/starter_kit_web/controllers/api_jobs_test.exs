@@ -19,7 +19,7 @@ defmodule StarterKitWeb.ApiJobsTest do
     start_dashboard_support()
     granted = post(auth, ~p"/api/v1/admin/jobs-access", %{})
     url = json_response(granted, 201)["data"]["url"]
-    assert url =~ Endpoint.url() <> "/admin/jobs/session?ticket="
+    assert url =~ Application.fetch_env!(:starter_kit, :api_origin) <> "/admin/jobs/session?ticket="
     assert granted.resp_cookies == %{}
     exchanged = get(conn |> put_req_header("accept", "text/html"), url)
     assert redirected_to(exchanged) == "/admin/jobs"
@@ -130,6 +130,25 @@ defmodule StarterKitWeb.ApiJobsTest do
 
     Repo.update!(Ecto.Changeset.change(issued.session, revoked_at: DateTime.utc_now(:second)))
     assert get(browser, url).status == 404
+  end
+
+  test "jobs handoff uses the API origin and cleanup purges unused expired tickets", %{auth: auth} do
+    previous = Application.fetch_env!(:starter_kit, :api_origin)
+    Application.put_env(:starter_kit, :api_origin, "https://api.example.test")
+    on_exit(fn -> Application.put_env(:starter_kit, :api_origin, previous) end)
+
+    url = json_response(post(auth, ~p"/api/v1/admin/jobs-access", %{}), 201)["data"]["url"]
+    assert url =~ "https://api.example.test/admin/jobs/session?ticket="
+    ticket = Repo.get_by!(Accounts.UserToken, context: "jobs_access")
+    assert :ok = Accounts.purge_expired_tokens()
+    assert Repo.get(Accounts.UserToken, ticket.id)
+
+    Repo.update!(
+      Ecto.Changeset.change(ticket, inserted_at: DateTime.add(DateTime.utc_now(:second), -61))
+    )
+
+    assert :ok = Accounts.purge_expired_tokens()
+    refute Repo.get(Accounts.UserToken, ticket.id)
   end
 
   defp exchange_token(conn, granted) do

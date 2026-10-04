@@ -20,8 +20,6 @@ defmodule StarterKitWeb.ApiPlatformTest do
           {"document", "application/pdf", 20_000_000},
           {"avatar", "image/webp", 2_000_000}
         ] do
-      before = DateTime.utc_now(:second)
-
       result =
         post(auth, ~p"/api/v1/direct-uploads", %{
           filename: "../../My File.PDF",
@@ -32,7 +30,7 @@ defmodule StarterKitWeb.ApiPlatformTest do
         })
 
       upload = json_response(result, 201)["data"]
-      assert Map.keys(upload) |> Enum.sort() == ~w(expiresAt headers key url)
+      assert Map.keys(upload) |> Enum.sort() == ~w(headers key method url)
       assert upload["key"] =~ "uploads/#{scope.organization.id}/"
       assert upload["key"] =~ "my-file.pdf"
       refute upload["key"] =~ ".."
@@ -41,8 +39,7 @@ defmodule StarterKitWeb.ApiPlatformTest do
       assert query["X-Amz-Expires"] == "600"
       assert query["X-Amz-SignedHeaders"] =~ "content-type"
       assert query["X-Amz-Signature"]
-      {:ok, expiry, 0} = DateTime.from_iso8601(upload["expiresAt"])
-      assert DateTime.diff(expiry, before) in 600..601
+      assert upload["method"] == "PUT"
       assert get_resp_header(result, "set-cookie") == []
     end
   end

@@ -42,7 +42,7 @@ defmodule StarterKitWeb.ApiBillingTest do
              ~w(canManage offerRevision offers plan sales subscription)
 
     assert data["plan"] == "free" and data["subscription"] == nil and data["canManage"]
-    assert data["sales"] == %{"status" => "test", "testMode" => true}
+    assert data["sales"] == "test"
     assert data["offerRevision"] == Billing.offer_revision()
 
     assert [
@@ -75,7 +75,7 @@ defmodule StarterKitWeb.ApiBillingTest do
 
       data = json_response(get(auth, ~p"/api/v1/settings/billing"), 200)["data"]
       refute data["canManage"]
-      assert data["sales"]["status"] == "closed"
+      assert data["sales"] == "closed"
 
       for path <- [
             "/api/v1/settings/billing/checkout-session",
@@ -124,6 +124,14 @@ defmodule StarterKitWeb.ApiBillingTest do
     assert idempotency =~ "#{scope.organization.id}-#{scope.user.id}-pro_monthly"
     post(auth, ~p"/api/v1/settings/billing/checkout-session", checkout()) |> json_response(201)
     assert_received {:checkout_form, _, [^idempotency]}
+    Repo.update!(Ecto.Changeset.change(scope.user, locale: "es"))
+    post(auth, ~p"/api/v1/settings/billing/checkout-session", checkout()) |> json_response(201)
+    assert_received {:checkout_form, localized, [localized_key]}
+    assert localized_key != idempotency
+    assert localized_key =~ "-es-"
+
+    assert localized["custom_text[submit][message]"] ==
+             StarterKit.I18n.t("billing.price_note", %{}, "es")
 
     assert_received {:analytics,
                      %{
@@ -173,7 +181,7 @@ defmodule StarterKitWeb.ApiBillingTest do
     assert Repo.aggregate(Event, :count) == 1
     put_flag(:billing, false)
 
-    assert json_response(get(auth, ~p"/api/v1/settings/billing"), 200)["data"]["sales"]["status"] ==
+    assert json_response(get(auth, ~p"/api/v1/settings/billing"), 200)["data"]["sales"] ==
              "closed"
 
     assert json_response(post(auth, ~p"/api/v1/settings/billing/portal-session", %{}), 201)["data"] ==

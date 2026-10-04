@@ -4,6 +4,6 @@
 export interface DirectUpload {
   url: string;
   key: string;
-  expiresAt: string;
+  method: string;
   headers: Record<string, string>;
 }

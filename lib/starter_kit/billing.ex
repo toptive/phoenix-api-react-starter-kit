@@ -90,7 +90,7 @@ defmodule StarterKit.Billing do
          subscription: subscription,
          offers: list_offers(),
          offer_revision: offer_revision(),
-         sales: %{status: sales(scope.user), test_mode: mode() == :test},
+         sales: sales(scope.user),
          can_manage: StarterKit.Policy.allowed?(scope, :manage_billing, scope.organization)
        }}
     else
@@ -549,7 +549,7 @@ defmodule StarterKit.Billing do
   # Repeated clicks within the hour reuse the same session instead of opening new ones.
   defp idempotency_key(user, org, offer) do
     hour = div(System.system_time(:second), 3600)
-    "checkout-v1-#{org.id}-#{user.id}-#{offer.id}-#{offer_revision()}-#{hour}"
+    "checkout-v1-#{org.id}-#{user.id}-#{offer.id}-#{offer_revision()}-#{user.locale}-#{hour}"
   end
 
   # Never send a customer to a page Stripe did not host.

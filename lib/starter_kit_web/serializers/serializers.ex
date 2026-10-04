@@ -141,7 +141,7 @@ defmodule StarterKitWeb.Serializers.DirectUploadSerializer do
 
   attribute :url, type: :string
   attribute :key, type: :string
-  attribute :expires_at, type: :utc_datetime
+  attribute :method, type: :string
   attribute :headers, type: {:map, :string}
 end
 

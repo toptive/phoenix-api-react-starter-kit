@@ -10,7 +10,6 @@ export type { AuditEvent } from "./AuditEvent";
 export type { Auth } from "./Auth";
 export type { AuthSession } from "./AuthSession";
 export type { BillingOverview } from "./BillingOverview";
-export type { BillingSales } from "./BillingSales";
 export type { Bootstrap } from "./Bootstrap";
 export type { DirectUpload } from "./DirectUpload";
 export type { EmailChange } from "./EmailChange";
