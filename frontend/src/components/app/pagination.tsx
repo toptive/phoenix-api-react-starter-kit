@@ -13,13 +13,16 @@ export function Pagination({ meta, href }: { meta: PaginationMeta; href: (page: 
 
   const link = (page: number, disabled: boolean, label: string, icon: "prev" | "next") =>
     disabled ? (
-      <span aria-disabled="true" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "pointer-events-none opacity-50")}>
+      <span
+        aria-disabled="true"
+        className={cn(buttonVariants({ variant: "outline", size: "default" }), "pointer-events-none opacity-50")}
+      >
         {icon === "prev" && <ChevronLeftIcon />}
         {label}
         {icon === "next" && <ChevronRightIcon />}
       </span>
     ) : (
-      <Link href={href(page)} className={buttonVariants({ variant: "outline", size: "sm" })}>
+      <Link href={href(page)} className={buttonVariants({ variant: "outline", size: "default" })}>
         {icon === "prev" && <ChevronLeftIcon />}
         {label}
         {icon === "next" && <ChevronRightIcon />}
@@ -27,8 +30,10 @@ export function Pagination({ meta, href }: { meta: PaginationMeta; href: (page: 
     )
 
   return (
-    <nav aria-label={t("pagination.label")} className="mt-6 flex items-center justify-between gap-4">
-      <p className="text-sm text-muted-foreground">{t("pagination.summary", { page: meta.page, pages: meta.totalPages, total: meta.total })}</p>
+    <nav aria-label={t("pagination.label")} className="mt-6 flex flex-wrap items-center justify-between gap-4">
+      <p className="text-sm text-muted-foreground">
+        {t("pagination.summary", { page: meta.page, pages: meta.totalPages, total: meta.total })}
+      </p>
       <div className="flex gap-2">
         {link(meta.page - 1, meta.page <= 1, t("pagination.previous"), "prev")}
         {link(meta.page + 1, meta.page >= meta.totalPages, t("pagination.next"), "next")}

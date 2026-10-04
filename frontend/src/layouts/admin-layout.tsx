@@ -7,7 +7,6 @@ import {
   GaugeIcon,
   HistoryIcon,
   LanguagesIcon,
-  ListChecksIcon,
   UsersIcon,
 } from "lucide-react"
 import type { ReactNode } from "react"
@@ -68,14 +67,6 @@ export function AdminLayout({ children }: { children: ReactNode }) {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <a href={paths.jobs}>
-                        <ListChecksIcon aria-hidden="true" />
-                        <span>{t("admin.nav.jobs")}</span>
-                      </a>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -83,7 +74,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           <SidebarFooter>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
+                <SidebarMenuButton asChild className="min-h-11">
                   <Link href={paths.dashboard}>
                     <ArrowLeftIcon aria-hidden="true" />
                     <span>{t("admin.nav.back")}</span>
@@ -95,7 +86,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
         </Sidebar>
         <SidebarInset>
           <header className="flex h-14 items-center gap-2 border-b px-4 md:hidden">
-            <SidebarTrigger />
+            <SidebarTrigger className="size-11" />
           </header>
           <div id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-8">
             {children}

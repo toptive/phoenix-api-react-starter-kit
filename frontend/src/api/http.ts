@@ -64,12 +64,22 @@ export async function request<T>(
   }
   if (body !== undefined) headers["Content-Type"] = "application/json"
   if (token) headers.Authorization = `Bearer ${token}`
-  const response = await fetch(route.url.startsWith("/") ? origin + route.url : route.url, {
-    method: route.method.toUpperCase(),
-    headers,
-    signal: options.signal,
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  })
+  let response: Response
+  try {
+    response = await fetch(route.url.startsWith("/") ? origin + route.url : route.url, {
+      method: route.method.toUpperCase(),
+      headers,
+      signal: options.signal,
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    })
+  } catch (error) {
+    if (!options.signal?.aborted) {
+      toast.error(i18n.t(typeof navigator !== "undefined" && !navigator.onLine ? "errors.offline" : "errors.network"), {
+        id: "network-status",
+      })
+    }
+    throw error
+  }
   if (response.status === 204 || response.status === 304) return { data: undefined as T }
   let payload: { error?: ApiErrorBody } & Partial<Envelope<T>> = {}
   try {
@@ -90,7 +100,17 @@ export async function request<T>(
     )
       sessionExpired()
     if (response.status === 429) toast.error(error.message)
-    if (!["sudo_required", "email_unavailable"].includes(error.code)) reportApiFailure(response.status)
+    if (
+      ![
+        "sudo_required",
+        "email_unavailable",
+        "ai_not_configured",
+        "uploads_not_configured",
+        "stripe_unavailable",
+        "test_mode",
+      ].includes(error.code)
+    )
+      reportApiFailure(response.status)
     throw error
   }
   if (!("data" in payload))

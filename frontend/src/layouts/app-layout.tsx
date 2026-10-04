@@ -4,7 +4,6 @@ import { HomeIcon, SettingsIcon, UsersIcon } from "lucide-react"
 import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
-import { ImpersonationBanner } from "@/components/app/impersonation-banner"
 import { Logo } from "@/components/app/logo"
 import { OrganizationSwitcher } from "@/components/app/organization-switcher"
 import { UserMenu } from "@/components/app/user-menu"
@@ -75,7 +74,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </SidebarFooter>
         </Sidebar>
         <SidebarInset>
-          <ImpersonationBanner />
           <header className="flex h-14 items-center gap-2 border-b px-4 md:hidden">
             <SidebarTrigger />
             <Logo href={paths.dashboard} />

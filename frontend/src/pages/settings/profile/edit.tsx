@@ -1,4 +1,6 @@
-import { useForm } from "react-hook-form"
+import { useState } from "react"
+import { FileField } from "@/components/app/file-field"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -18,10 +20,12 @@ export default function ProfileEdit() {
   const { t } = useTranslation()
   const { auth, locales } = useAppConfig()
   const update = useUpdateProfile()
+  const [uploading, setUploading] = useState(false)
   const form = useForm({
     resolver: zodResolver(profileSchema(locales)),
-    defaultValues: { name: auth!.user.name, locale: auth!.user.locale },
+    defaultValues: { name: auth!.user.name, locale: auth!.user.locale, avatarKey: undefined as string | undefined },
   })
+  const avatarKey = useWatch({ control: form.control, name: "avatarKey" })
   return (
     <SettingsSection title={t("settings.profile.title")} description={t("settings.profile.lead")}>
       <title>{t("settings.profile.title")}</title>
@@ -29,6 +33,7 @@ export default function ProfileEdit() {
         noValidate
         className="grid gap-6"
         onSubmit={form.handleSubmit(async (input) => {
+          if (uploading) return
           try {
             const user = await update.mutateAsync(input)
             form.reset({ name: user.name, locale: user.locale })
@@ -62,9 +67,22 @@ export default function ProfileEdit() {
             </NativeSelect>
           )}
         </FormField>
+        <FileField
+          kind="avatar"
+          value={avatarKey}
+          label={t("settings.profile.avatar")}
+          help={t("settings.profile.avatar_help")}
+          disabled={update.isPending}
+          onBusyChange={setUploading}
+          error={fieldMessage(form.formState.errors.avatarKey?.message)}
+          onChange={(key) => {
+            form.clearErrors("avatarKey")
+            form.setValue("avatarKey", key, { shouldDirty: true })
+          }}
+        />
         <FormError message={form.formState.errors.root?.message} />
         <div>
-          <Button type="submit" disabled={update.isPending || !form.formState.isDirty}>
+          <Button type="submit" disabled={update.isPending || uploading || !form.formState.isDirty}>
             {t("common.save_changes")}
           </Button>
         </div>

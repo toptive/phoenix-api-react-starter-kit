@@ -1,3 +1,7 @@
+import type { LegalPage } from "@/api/generated/serializers"
+import { qk } from "@/api/query-keys"
+import { NetworkStatus } from "@/components/app/network-status"
+import { Toaster } from "@/components/ui/sonner"
 import "./css/app.css"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
@@ -31,11 +35,24 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () 
 // The landing arrives prerendered. Replace it after bootstrap resolves into the SPA shell.
 const element = document.getElementById("root")
 if (!element) throw new Error("Missing application root")
+const publicLegal = document.getElementById("prerendered-legal")
+if (publicLegal?.textContent) {
+  try {
+    const { locale, page } = JSON.parse(publicLegal.textContent) as { locale: string; page: LegalPage }
+    if (typeof locale === "string" && typeof page?.slug === "string")
+      queryClient.setQueryData(qk.legal(page.slug, locale), page, { updatedAt: 0 })
+  } catch {
+    /* A stale static artifact can always load through the API. */
+  }
+}
+document.querySelectorAll("[data-prerendered]").forEach((metadata) => metadata.remove())
 createRoot(element).render(
   <StrictMode>
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={queryClient}>
+        <NetworkStatus />
         <RouterProvider router={router} />
+        <Toaster position="bottom-right" richColors closeButton />
       </QueryClientProvider>
     </I18nextProvider>
   </StrictMode>,

@@ -8,6 +8,7 @@ import {
   type ErrorComponentProps,
 } from "@tanstack/react-router"
 import type { QueryClient } from "@tanstack/react-query"
+import { listSearchSchema, translationSearchSchema, billingSearchSchema } from "@/schemas/search"
 import { bundledLocales } from "@/i18n"
 import { AppShell } from "@/app-shell"
 import { bootstrapOptions } from "@/api/hooks/bootstrap"
@@ -21,6 +22,7 @@ import { ApiError } from "@/api/http"
 import { queryClient } from "@/lib/query-client"
 import { guardRoute, type Guard } from "@/lib/route-guards"
 import { returnPath } from "@/lib/auth-flow"
+import { ImpersonationBanner } from "@/components/app/impersonation-banner"
 import ErrorShow from "@/pages/errors/show"
 import { TextLink } from "@/components/app/text-link"
 import { paths } from "@/lib/paths"
@@ -35,7 +37,7 @@ declare module "@tanstack/react-router" {
 interface RouterContext {
   queryClient: QueryClient
 }
-function RouteError({ error }: ErrorComponentProps) {
+function RouteError({ error, reset }: ErrorComponentProps) {
   const { t } = useTranslation()
   const message = error instanceof Error ? error.message : "internal_error"
   if (["oauth_failed", "email_not_verified", "invitation_required", "signup_closed", "state_invalid"].includes(message))
@@ -45,7 +47,12 @@ function RouteError({ error }: ErrorComponentProps) {
         <TextLink href={paths.signIn}>{t("nav.sign_in")}</TextLink>
       </div>
     )
-  return <ErrorShow status={error instanceof ApiError ? error.status : 500} />
+  return (
+    <>
+      <ImpersonationBanner />
+      <ErrorShow status={error instanceof ApiError ? error.status : 500} onRetry={reset} />
+    </>
+  )
 }
 const rootRoute = createRootRouteWithContext<RouterContext>()({
   component: AppShell,
@@ -93,17 +100,6 @@ const authSearch = (search: Record<string, unknown>): Record<string, string> =>
 const localeSearch = (search: Record<string, unknown>) => ({
   ...(typeof search.locale === "string" ? { locale: search.locale } : {}),
 })
-const listSearch = (search: Record<string, unknown>) => ({
-  ...localeSearch(search),
-  q: typeof search.q === "string" ? search.q.trim() : "",
-  page: Math.min(1_000_000, Math.max(1, Math.floor(Number(search.page) || 1))),
-  perPage: Math.min(100, Math.max(1, Math.floor(Number(search.perPage) || 25))),
-  missing: search.missing === true || search.missing === "true" || search.missing === "1",
-})
-const billingSearch = (search: Record<string, unknown>) => ({
-  ...localeSearch(search),
-  ...(search.checkout === "done" ? { checkout: "done" } : {}),
-})
 const route = (path: string, guard: Guard, shell: Shell, component = reservedComponent) =>
   createRoute({
     getParentRoute: () => rootRoute,
@@ -112,9 +108,10 @@ const route = (path: string, guard: Guard, shell: Shell, component = reservedCom
     validateSearch: ["/admin/users", "/admin/organizations", "/admin/translations", "/admin/audit-events"].includes(
       path,
     )
-      ? listSearch
+      ? (search) =>
+          path === "/admin/translations" ? translationSearchSchema.parse(search) : listSearchSchema.parse(search)
       : path === "/settings/billing"
-        ? billingSearch
+        ? (search) => billingSearchSchema.parse(search)
         : shell === "auth"
           ? authSearch
           : localeSearch,
@@ -248,7 +245,12 @@ const routes = [
     "settings",
     lazyRouteComponent(() => import("@/pages/settings/members/index")),
   ),
-  route("/settings/billing", "user", "settings"),
+  route(
+    "/settings/billing",
+    "user",
+    "settings",
+    lazyRouteComponent(() => import("@/pages/settings/billing/show")),
+  ),
   route(
     "/settings/email/edit",
     "sudo",
@@ -273,17 +275,60 @@ const routes = [
     "settings",
     lazyRouteComponent(() => import("@/pages/settings/email-confirmations/show")),
   ),
-  ...[
-    "",
-    "/users",
-    "/users/$id",
-    "/organizations",
-    "/organizations/$id",
-    "/translations",
-    "/legal-documents",
-    "/legal-documents/$slug",
-    "/audit-events",
-  ].map((path) => route(`/admin${path}`, "superadmin", "admin")),
+  route(
+    "/admin",
+    "superadmin",
+    "admin",
+    lazyRouteComponent(() => import("@/pages/admin/dashboard/show")),
+  ),
+  route(
+    "/admin/users",
+    "superadmin",
+    "admin",
+    lazyRouteComponent(() => import("@/pages/admin/users/index")),
+  ),
+  route(
+    "/admin/users/$id",
+    "superadmin",
+    "admin",
+    lazyRouteComponent(() => import("@/pages/admin/users/show")),
+  ),
+  route(
+    "/admin/organizations",
+    "superadmin",
+    "admin",
+    lazyRouteComponent(() => import("@/pages/admin/organizations/index")),
+  ),
+  route(
+    "/admin/organizations/$id",
+    "superadmin",
+    "admin",
+    lazyRouteComponent(() => import("@/pages/admin/organizations/show")),
+  ),
+  route(
+    "/admin/translations",
+    "superadmin",
+    "admin",
+    lazyRouteComponent(() => import("@/pages/admin/translations/index")),
+  ),
+  route(
+    "/admin/legal-documents",
+    "superadmin",
+    "admin",
+    lazyRouteComponent(() => import("@/pages/admin/legal-documents/index")),
+  ),
+  route(
+    "/admin/legal-documents/$slug",
+    "superadmin",
+    "admin",
+    lazyRouteComponent(() => import("@/pages/admin/legal-documents/show")),
+  ),
+  route(
+    "/admin/audit-events",
+    "superadmin",
+    "admin",
+    lazyRouteComponent(() => import("@/pages/admin/audit-events/index")),
+  ),
   route("/errors/403", "public", "public", () => <ErrorShow status={403} />),
   route("/errors/404", "public", "public", () => <ErrorShow status={404} />),
   route("/errors/500", "public", "public", () => <ErrorShow status={500} />),

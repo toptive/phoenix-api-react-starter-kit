@@ -10,13 +10,16 @@ import {
   Outlet,
 } from "@tanstack/react-router"
 import { createI18n, bundledLocales } from "@/i18n"
+import LegalShow from "@/pages/legal/show"
+import { apiV1LegalPages } from "@/api/generated/routes"
+import type { LegalPage } from "@/api/generated/serializers"
 import type { Bootstrap } from "@/api/generated/serializers"
 import { qk } from "@/api/query-keys"
 import { PublicLayout } from "@/layouts/public-layout"
 import HomeShow from "@/pages/home/show"
 
 /** Build-time public defaults; runtime flags and text edits come from bootstrap. */
-export async function render(locale = "en") {
+export async function render(locale = "en", legalPage?: LegalPage, pathname?: string) {
   const queryClient = new QueryClient()
   const localeInstance = createI18n(locale)
   const bootstrap: Bootstrap = {
@@ -36,6 +39,7 @@ export async function render(locale = "en") {
     turnstile: { required: false, siteKey: null },
   }
   queryClient.setQueryData(qk.bootstrap, bootstrap)
+  if (legalPage) queryClient.setQueryData(qk.legal(legalPage.slug, locale), legalPage)
   const root = createRootRoute({
     component: () => (
       <PublicLayout>
@@ -46,8 +50,13 @@ export async function render(locale = "en") {
   const home = createRoute({ getParentRoute: () => root, path: "/", component: HomeShow })
   const localized = createRoute({ getParentRoute: () => root, path: "/$locale", component: HomeShow })
   const router = createRouter({
-    routeTree: root.addChildren([home, localized]),
-    history: createMemoryHistory({ initialEntries: [locale === "en" ? "/" : `/${locale}`] }),
+    routeTree: root.addChildren([
+      home,
+      localized,
+      createRoute({ getParentRoute: () => root, path: "/legal/$slug", component: LegalShow }),
+      createRoute({ getParentRoute: () => root, path: "/$locale/legal/$slug", component: LegalShow }),
+    ]),
+    history: createMemoryHistory({ initialEntries: [pathname ?? (locale === "en" ? "/" : `/${locale}`)] }),
   })
   await router.load()
   const html = renderToString(
@@ -60,3 +69,5 @@ export async function render(locale = "en") {
   queryClient.clear()
   return html
 }
+
+export const legalPageUrl = (slug: string, locale: string) => apiV1LegalPages.show(slug, { query: { locale } }).url

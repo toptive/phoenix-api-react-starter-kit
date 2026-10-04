@@ -5,7 +5,8 @@ import { useTranslation } from "react-i18next"
 import { useBootstrap } from "@/api/hooks/bootstrap"
 import { useLocales } from "@/api/hooks/locales"
 import { SudoProvider } from "@/components/app/sudo-dialog"
-import { Toaster } from "@/components/ui/sonner"
+import { AppErrorBoundary } from "@/components/app/error-boundary"
+import { ImpersonationBanner } from "@/components/app/impersonation-banner"
 import ErrorShow from "@/pages/errors/show"
 import { ApiError } from "@/api/http"
 
@@ -19,8 +20,13 @@ export function AppShell() {
   const missing = useRouterState({
     select: (state) => state.matches.some((match) => match.status === "notFound" || match._notFound),
   })
-  if (missing) return <ErrorShow status={404} />
-  return <BootstrapShell />
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  return (
+    <>
+      <ImpersonationBanner />
+      <AppErrorBoundary key={pathname}>{missing ? <ErrorShow status={404} /> : <BootstrapShell />}</AppErrorBoundary>
+    </>
+  )
 }
 function BootstrapShell() {
   const status = useApiFailure()
@@ -65,7 +71,6 @@ function ReadyShell({ errorStatus }: { errorStatus?: number }) {
           <PublicLayout>{content}</PublicLayout>
         )}
       </Suspense>
-      <Toaster position="bottom-right" richColors closeButton />
     </SudoProvider>
   )
 }

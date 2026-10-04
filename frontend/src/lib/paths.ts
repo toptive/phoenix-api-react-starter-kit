@@ -20,7 +20,6 @@ export const paths = {
   organization: "/settings/organization/edit",
   members: "/settings/members",
   billing: "/settings/billing",
-  jobs: `${(import.meta.env.VITE_API_URL ?? "").replace(/\/api\/v1\/?$/, "").replace(/\/$/, "")}/admin/jobs`,
   admin: "/admin",
   adminUsers: "/admin/users",
   adminOrganizations: "/admin/organizations",

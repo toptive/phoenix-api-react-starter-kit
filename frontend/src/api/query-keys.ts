@@ -1,4 +1,17 @@
+import type { ListSearch, TranslationSearch } from "@/schemas/search"
 export const qk = {
+  adminStats: ["admin", "stats"] as const,
+  adminUsers: (search: ListSearch) => ["admin", "users", "list", search] as const,
+  adminUser: (id: string) => ["admin", "users", "detail", id] as const,
+  adminOrganizations: (search: ListSearch) => ["admin", "organizations", "list", search] as const,
+  adminOrganization: (id: string) => ["admin", "organizations", "detail", id] as const,
+  adminTranslationsRoot: ["admin", "translations"] as const,
+  adminTranslations: (search: TranslationSearch) => ["admin", "translations", search] as const,
+  adminLegalRoot: ["admin", "legal"] as const,
+  adminLegal: (slug: string) => ["admin", "legal", slug] as const,
+  adminAuditRoot: ["admin", "audit"] as const,
+  adminAudit: (search: ListSearch) => ["admin", "audit", search] as const,
+
   emailPreferences: ["email-preferences"] as const,
   sessions: ["sessions"] as const,
   accountDeletion: ["account-deletion"] as const,

@@ -6,7 +6,9 @@ import { qk } from "../query-keys"
 export const useLegalPage = (slug: string, locale: string) =>
   useQuery({
     queryKey: qk.legal(slug, locale),
-    queryFn: async () => (await api.get<LegalPage>(apiV1LegalPages.show(slug, { query: { locale } }))).data,
+    queryFn: async ({ signal }) =>
+      (await api.get<LegalPage>(apiV1LegalPages.show(slug, { query: { locale } }), { signal })).data,
+    retry: false,
   })
 export const recordPageView = (page: string) =>
   api.post(apiV1Events.create(), { name: "page_viewed", properties: { page } })

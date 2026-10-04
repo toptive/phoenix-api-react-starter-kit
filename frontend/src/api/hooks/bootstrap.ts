@@ -11,7 +11,7 @@ export const bootstrapOptions = () =>
     staleTime: 30_000,
     retry: false,
   })
-export const useBootstrap = () => useQuery(bootstrapOptions())
+export const useBootstrap = (enabled = true) => useQuery({ ...bootstrapOptions(), enabled })
 /** The shell only renders children after bootstrap. */
 export function useAppConfig(): Bootstrap {
   const { data } = useBootstrap()

@@ -1,5 +1,7 @@
 import type { DirectUpload } from "./generated/serializers"
 import { apiV1DirectUploads } from "./generated/routes"
+import { i18n } from "@/i18n"
+import { toast } from "sonner"
 import { api, ApiError } from "./http"
 
 export type UploadKind = "image" | "document" | "avatar"
@@ -27,7 +29,13 @@ export async function uploadFile(file: File, kind: UploadKind): Promise<string> 
     if (error instanceof ApiError) throw new UploadError(error.code, error.message)
     throw error
   }
-  const put = await fetch(upload.url, { method: upload.method, headers: upload.headers, body: file })
-  if (!put.ok) throw new UploadError("storage_rejected", put.statusText)
+  let put: Response
+  try {
+    put = await fetch(upload.url, { method: "PUT", headers: upload.headers, body: file })
+  } catch {
+    toast.error(i18n.t("errors.network"), { id: "network-status" })
+    throw new UploadError("network", i18n.t("errors.network"))
+  }
+  if (!put.ok) throw new UploadError("storage_rejected", i18n.t("errors.api.storage_rejected"))
   return upload.key
 }
