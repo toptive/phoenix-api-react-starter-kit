@@ -36,8 +36,7 @@ defmodule StarterKitWeb.EmailPreferencesTest do
     end
   end
 
-  test "the gallery route is off without dev_routes (test, prod)" do
-    assert Phoenix.Router.route_info(StarterKitWeb.Router, "GET", "/dev/emails", "localhost") ==
-             :error
+  test "the gallery route is off without dev_routes (test, prod)", %{conn: conn} do
+    assert get(conn, "/dev/emails").status == 404
   end
 end

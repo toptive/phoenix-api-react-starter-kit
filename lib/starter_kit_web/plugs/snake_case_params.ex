@@ -1,7 +1,6 @@
 defmodule StarterKitWeb.Plugs.SnakeCaseParams do
   @moduledoc """
-  The wire is camelCase in both directions: props and JSON go out camelized (Inertia
-  `camelize_props` + serializers), and form/JSON keys come in camelCase
+  The wire is camelCase in both directions: props and JSON go out camelized (  `camelize_props` + serializers), and form/JSON keys come in camelCase
   (`passwordConfirmation`). This plug turns incoming keys into snake_case before the
   controller sees them. Only identifier-like keys change (`rememberMe`); data keys such
   as locales (`zh-HK`) or translation keys (`nav.home`) are left alone.

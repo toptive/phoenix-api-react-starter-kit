@@ -148,7 +148,7 @@ defmodule StarterKit.I18n do
     if map_size(bindings) == 0, do: error, else: Map.put(error, :bindings, bindings)
   end
 
-  @doc "All changeset errors as `%{field => first message}` (Inertia form errors)."
+  @doc "All changeset errors as `%{field => first message}` (translated form errors)."
   def translate_changeset_errors(%Ecto.Changeset{} = changeset, locale) do
     changeset
     |> Ecto.Changeset.traverse_errors(&translate_error(&1, locale))

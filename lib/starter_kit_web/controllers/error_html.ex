@@ -1,8 +1,7 @@
 defmodule StarterKitWeb.ErrorHTML do
   @moduledoc """
   Last-resort error pages (unmatched routes, crashes). Standalone HTML: no React, no
-  database. Expected errors inside controllers (403, 404) render the Inertia page
-  `errors/show` instead (see `StarterKitWeb.ErrorPages`).
+  database. API controller errors use the JSON envelope.
   """
 
   use StarterKitWeb, :html

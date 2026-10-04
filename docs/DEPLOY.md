@@ -8,9 +8,9 @@ Claude skill: it runs every gate, shows what changed, asks for confirmation and 
 `Dockerfile`, two stages:
 
 1. **builder** — `hexpm/elixir` + the Node binary + pnpm: `mix deps.get`, `pnpm install`,
-   `pnpm build` (Vite client → `priv/static/assets`, SSR → `priv/ssr/ssr.js`), pre-compress
+   `pnpm install --frozen-lockfile && pnpm build` (SPA and prerendered pages → `priv/static`), pre-compress
    static files, `mix release`.
-2. **runner** — Debian slim + the release + the `node` binary only + `tini`. User `nobody`.
+2. **runner** — Debian slim + the release + `tini`. User `nobody`.
 
 Kamal builds from a clean clone of the committed `HEAD`: uncommitted changes never ship.
 
@@ -75,8 +75,8 @@ library reads it by itself). Decode a Base64 secret with `Base.decode64(v, ignor
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | for bot protection | the `turnstile` switch at the top of `deploy.yml` (default `false`); [AUTH.md](AUTH.md#bot-protection-turnstile) |
 | `STRIPE_<MODE>_SECRET_KEY`, `STRIPE_<MODE>_WEBHOOK_SECRET` | for billing | the `billing` switch at the top of `deploy.yml` (default `"off"`); `cred get` lines and steps in [BILLING.md](BILLING.md#deploy) |
 
-Clear env: `PHX_HOST`, `APP_NAME`, `POOL_SIZE` (8), `SITE_INDEXING` (`0` until launch, [SEO.md](SEO.md)), `SIGNUP_MODE` (`invite` until launch, then `open`; [AUTH.md](AUTH.md#sign-up-modes)), `OBAN_*_CONCURRENCY`, `SSR_POOL_SIZE` (1),
-`MAIL_FROM`, `MAIL_FROM_NAME` (per locale: `MAIL_FROM_ES`, `MAIL_FROM_NAME_ES`), `S3_*`. Optional: `SSR=0` disables SSR, `ERL_AFLAGS` for BEAM flags,
+Clear env: `PHX_HOST`, `APP_NAME`, `POOL_SIZE` (8), `SITE_INDEXING` (`0` until launch, [SEO.md](SEO.md)), `SIGNUP_MODE` (`invite` until launch, then `open`; [AUTH.md](AUTH.md#sign-up-modes)), `OBAN_*_CONCURRENCY`,
+`MAIL_FROM`, `MAIL_FROM_NAME` (per locale: `MAIL_FROM_ES`, `MAIL_FROM_NAME_ES`), `S3_*`. Optional: `ERL_AFLAGS` for BEAM flags,
 `POSTMARK_TRANSACTIONAL_STREAM` (`outbound`) / `POSTMARK_BROADCAST_STREAM` (`broadcast`).
 **Staging and previews: set `MAIL_ALLOWED_RECIPIENTS`** (`qa@toptive.co,*@toptive.co`): mail to any
 other address is dropped and logged, so test data never emails a real person. Leave it unset in
@@ -98,7 +98,7 @@ Facundo runs these (servers are read-only for Claude):
 6. Check: `curl -fsS https://<host>/health` answers `ok`; `kamal logs` shows `Migrated` and no
    errors.
 7. Create the first superadmin with the bootstrap task ([ADMIN.md](ADMIN.md#first-superadmin)).
-8. Launch day: `SITE_INDEXING: "1"` ([SEO.md](SEO.md)) and `SIGNUP_MODE: open`
+8. Launch day: `site_indexing = "1"` at the top of `config/deploy.yml` ([SEO.md](SEO.md)) and `SIGNUP_MODE: open`
    ([AUTH.md](AUTH.md#sign-up-modes)), then `kamal deploy`.
 
 If `kamal setup` stops at the health check, read `kamal app logs`: a failed migration or a
@@ -120,3 +120,17 @@ nothing; look again only if `/health` checks or real requests fail. (Investigate
 2026-10: four such lines, zero failed requests.)
 
 Public links and crawler infrastructure use `PUBLIC_URL` (falls back to `SPA_ORIGIN`). The API origin for machine unsubscribe headers is `API_URL` / `API_ORIGIN`, defaulting to the Phoenix host and port. Keep public and API origins distinct when deploying separate hosts.
+
+## SPA build configuration
+
+Node and pnpm exist only in the builder. The runner serves the built SPA from Phoenix and
+starts `/app/bin/launch`: migrations, i18n sync, then the release server.
+`VITE_API_URL` defaults to same-origin requests. Set it when the API has a separate origin;
+`API_URL`, `PUBLIC_URL`, `SPA_ORIGIN` and `CORS_ORIGINS` must agree with that deployment.
+Build args `VITE_API_URL`, `VITE_PUBLIC_URL`, `VITE_SITE_INDEXING` and optional
+`VITE_PRERENDER_API_URL` set the bundled frontend configuration. Never pass secrets as Vite variables.
+Static branding in `priv/static` survives the Vite build. Only generated HTML and hashed assets
+are excluded from the Docker context; their build output is copied into the release.
+
+The `site_indexing` deploy switch writes both `SITE_INDEXING` and `VITE_SITE_INDEXING`,
+so a launch or indexing lock applies to the runtime headers and prerendered SPA metadata together.

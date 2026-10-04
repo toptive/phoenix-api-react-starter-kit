@@ -32,8 +32,8 @@ defmodule StarterKitWeb.PlaceholderTest do
   # The files a visitor, a crawler or a mail client can see, plus the config behind them.
   @shipped_globs [
     "lib/**/*.{ex,heex}",
-    "assets/js/**/*.{ts,tsx}",
-    "assets/css/**/*.css",
+    "frontend/src/**/*.{ts,tsx}",
+    "frontend/src/styles/**/*.css",
     "i18n/**/*.{csv,json}",
     "config/**/*.{exs,yml}",
     "priv/static/*.{svg,webmanifest,txt}"

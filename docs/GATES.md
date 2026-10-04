@@ -15,24 +15,13 @@ When a gate fails, fix the code — never weaken the gate, never add a todo list
 | mix_audit | `mix deps.audit` | vulnerable Hex packages |
 | hex_audit | `mix hex.audit` | retired packages |
 | unused_deps | `mix deps.unlock --check-unused` | lockfile hygiene |
-| ex_unit | `mix test` | tests, incl. `test/architecture` and typelizer prop validation |
+| ex_unit | `mix test` | tests, incl. `test/architecture` |
 | typelizer | `mix typelizer.check` | generated TypeScript out of date |
 | ts_typecheck | `pnpm typecheck` | TypeScript strict |
-| eslint | `pnpm lint` | hard-coded colours, literal UI text, react-hook-form/axios/fetch, hooks rules |
-| vitest | `pnpm test` | frontend unit tests |
+| eslint | `pnpm lint` | hard-coded colours, literal UI text, direct fetch/axios, hooks rules, catalogue completeness |
+| vitest | `pnpm test` | pure functions and HTTP envelope handling |
+| playwright (separate command) | `pnpm e2e` | browser journeys against the real kit API; not yet included in `bin/check` |
 | pnpm_audit | `pnpm audit --audit-level=high` | vulnerable npm packages |
-
-## Testing policy
-
-Prefer end-to-end behavior through the public surface. Backend request tests use the real HTTP
-router, bearer plug, policies, database, serializers and envelope. Cover each endpoint's success,
-validation, unauthorized, forbidden and tenant isolation outcomes, and chain endpoints in flow
-tests. Context tests are reserved for real branching such as money, dates, policies and parsers.
-Do not test private helpers, standalone serializers or trivial getters.
-
-SPA user flows use Playwright in `frontend/e2e/` against the real backend. Vitest covers pure
-functions such as envelope parsing and date/money formatting; no component render tests with
-mocked APIs. Architecture tests continue to guard the rulebook and remain part of `mix test`.
 
 ## Architecture tests (`test/architecture`)
 
@@ -43,9 +32,8 @@ mocked APIs. Architecture tests continue to guard the rulebook and remain part o
 - every tenant schema has an isolation test;
 - web code never touches `Repo`, `Ecto.Query` or changesets;
 - React files are kebab-case; every static i18n key exists in the CSV;
-- every rendered page exists and every page is rendered;
-- every `render_public` page is reachable by the SSR page glob (tests render without SSR, so a
-  missing page fails only in production with a 500).
+- every SPA page has a route or error component in `frontend/src/router.tsx`;
+- every generated API route action has a caller or a documented external consumer.
 
 ## Where they run
 
@@ -91,3 +79,73 @@ Several apps or worktrees can run on one machine. Each checkout sets its own env
 
 Postgres allows 100 connections. Keep `POOL_SIZE` small (2–5) when several lanes run at once.
 `ERL_FLAGS="+S 2:2"` limits the BEAM to two schedulers on a busy machine.
+
+## Browser journeys against the kit API
+
+Prefer end-to-end behavior tests: backend requests exercise the real router, auth, policies,
+database and serializers; SPA journeys use Chromium in `frontend/e2e/`. Vitest is for pure
+functions and HTTP envelope handling. Do not render components against mocked APIs.
+The browser suite never intercepts or replaces `/api/v1` responses. External services such
+as Stripe and AI are stubbed at the backend's upstream HTTP boundary.
+
+Install once with `pnpm exec playwright install chromium`. Run `pnpm e2e` from the root;
+`pnpm e2e:ui` opens Playwright's UI. Playwright starts and stops Vite on 5173 with a proxy to
+`E2E_API_URL` (default `http://localhost:4100`). Setting `E2E_BASE_URL` uses an already running
+SPA instead. That SPA must point to the same API. Failure traces and screenshots are in
+`frontend/test-results/`; the HTML report is in `frontend/playwright-report/` (both ignored).
+
+The API must be running first. For the Phoenix API kit, the development fallback is:
+
+```sh
+cd /path/to/phoenix-api-react-starter-kit
+PGDATABASE=starter_kit_e2e mix ecto.create
+PGDATABASE=starter_kit_e2e mix ecto.migrate
+PGDATABASE=starter_kit_e2e PORT=4100 VITE_PORT=5199 SPA_ORIGIN=http://localhost:5173 MAIL_ADAPTER=local mix phx.server
+```
+
+`config/dev.exs` reads `PGDATABASE`, `PORT` and `VITE_PORT`; `runtime.exs` reads `SPA_ORIGIN`.
+The dev mailer already uses Swoosh Local (the current kit does not read `MAIL_ADAPTER`).
+`/dev/mailbox/json` returns recipient, text and HTML bodies; fixtures poll it to obtain
+single-use links. Set `E2E_MAILBOX_PATH` for another kit's equivalent test mailbox. Users,
+confirmation, onboarding and password setup all go through generated API routes. Fixtures
+respect rate limits and their real `Retry-After`; they create unique addresses per test.
+
+The only direct database fixture adjustments are expiring a test session's sudo window
+(to exercise a real 403 without waiting ten minutes) and promoting a test account when
+admin journeys are enabled. They use `psql` and `E2E_PGDATABASE` (default `starter_kit_e2e`),
+with the normal local `PGHOST`/`PGPORT`/`PGUSER`/`PGPASSWORD` settings. A database name must
+contain `e2e` or `test`. Other kits should replace these two fixtures with their test helper;
+do not bypass registration or business actions. The unsubscribe journey queues a real optional
+notification through the Phoenix public context from a small `mix run --no-start` process
+with queues disabled; the running API delivers it to the mailbox. Set `E2E_API_DIR` to that
+checkout (default: the sibling Phoenix API kit used during SPA development). Other backend
+lanes replace this mail arrangement with their equivalent test helper. The browser still
+previews and opts out through the public API.
+
+Each backend lane wires this into its `bin/check` after request tests and frontend gates:
+create and migrate a dedicated E2E database; boot the API in test mode on 4100 with the local
+mailbox, HTTP stubs and normal DB connections available across requests; wait for `/health`;
+run `E2E_API_URL=http://localhost:4100 E2E_PGDATABASE=<isolated-db> pnpm e2e`; stop the API in
+an EXIT/INT/TERM trap, including on test failure. A Phoenix test server needs its test
+configuration to read the chosen port/database, enable test mailbox routes, start the
+endpoint and allow browser requests through its sandbox. The current backend test config
+is not yet a standalone E2E server; the commands above run in development until that lane
+lands. API boot is deliberately owned by `bin/check`, rather than a SPA script tied to Mix.
+
+Admin journeys (texts edit/fill, impersonation/back, legal publication, audit and Jobs) have
+explicit `test.skip` reasons while the Phoenix admin lane is in progress. Set `E2E_ADMIN=1`
+when it has landed, with the backend's fake AI HTTP adapter for Fill. Billing checkout and
+portal journeys use `E2E_BILLING=1` once the billing API lane supplies Stripe test HTTP stubs
+and subscription fixtures. Skips are reported and must be removed or enabled in those lanes.
+
+`pnpm i18n:audit` checks English and Spanish, frontend key references, backend references,
+dynamic namespaces and plural variants. `pnpm lint` runs it as a gate. To remove genuinely
+unused keys, run `node i18n/scripts/audit.mjs --prune`, review the CSV diff, then
+`pnpm i18n:build`. Runtime and backend text must stay in the shared catalogue.
+
+## Testing policy
+
+HTTP API tests cover success, validation, unauthorized, forbidden, isolation and multi-endpoint
+flows through the real router, bearer plug, policies, database and serializers. Context tests
+cover branching behavior only. Playwright covers SPA flows against the real backend; Vitest
+covers pure functions and HTTP transport. No isolated serializer or mocked component tests.

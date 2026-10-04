@@ -2,6 +2,22 @@ defmodule StarterKitWeb.SiteIndexingTest do
   # Changes application env (allowed_training_bots): not async.
   use StarterKitWeb.ConnCase, async: false
 
+  setup do
+    root =
+      Path.join(System.tmp_dir!(), "starter-kit-indexing-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(root)
+    File.write!(Path.join(root, "index.html"), "<html><head></head><body>SPA</body></html>")
+    Application.put_env(:starter_kit, :spa_static_dir, root)
+
+    on_exit(fn ->
+      Application.delete_env(:starter_kit, :spa_static_dir)
+      File.rm_rf!(root)
+    end)
+
+    :ok
+  end
+
   test "robots.txt has groups for search and AI-training crawlers", %{conn: conn} do
     robots = conn |> get(~p"/robots.txt") |> response(200)
 
@@ -32,7 +48,7 @@ defmodule StarterKitWeb.SiteIndexingTest do
     assert conn |> get("/favicon.svg") |> get_resp_header("x-robots-tag") == ["noindex, nofollow"]
 
     not_found = get(conn, "/xx/legal/terms")
-    assert html_response(not_found, 404)
+    assert html_response(not_found, 200)
     assert get_resp_header(not_found, "x-robots-tag") == ["noindex, nofollow"]
 
     assert conn |> get(~p"/robots.txt") |> response(200) ==

@@ -23,7 +23,7 @@ for every new product.
 | Postgres 17 (tuned below, capped at 1.2 GB) | ~1 GB |
 | **Left for apps** | **~2.5 GB** |
 
-Each app idles at ~105 MB and reaches ~150 MB under load, SSR worker included
+Budget each API app at up to 150 MB idle; measure production workloads
 ([PERFORMANCE.md](PERFORMANCE.md)); each container is capped at 400 MB (`deploy.yml`).
 Keeping a third of the RAM free for peaks and the page cache: **plan for about 10 small products**
 on this droplet (2.5 GB × ⅔ ÷ 150 MB ≈ 11). The 2 GB swap file is a safety net, not capacity.

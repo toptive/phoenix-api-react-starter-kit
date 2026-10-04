@@ -5,6 +5,8 @@ export type { AdminOrganization } from "./AdminOrganization";
 export type { AdminOrganizationDetail } from "./AdminOrganizationDetail";
 export type { AdminStats } from "./AdminStats";
 export type { AdminUserDetail } from "./AdminUserDetail";
+export type { ApiEnvelope } from "./ApiEnvelope";
+export type { ApiErrorBody } from "./ApiErrorBody";
 export type { AppConfig } from "./AppConfig";
 export type { AuditEvent } from "./AuditEvent";
 export type { Auth } from "./Auth";
@@ -15,7 +17,15 @@ export type { DirectUpload } from "./DirectUpload";
 export type { EmailChange } from "./EmailChange";
 export type { EmailPreferences } from "./EmailPreferences";
 export type { EmailSubscription } from "./EmailSubscription";
+export type {
+  CursorMeta,
+  CursorPaginated,
+  Envelope,
+  Paginated,
+  PaginationMeta,
+} from "./Envelope";
 export type { EventReceipt } from "./EventReceipt";
+export type { FieldError } from "./FieldError";
 export type { Flags } from "./Flags";
 export type { Invitation } from "./Invitation";
 export type { InvitationPreview } from "./InvitationPreview";

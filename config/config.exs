@@ -76,14 +76,6 @@ config :starter_kit, Oban,
 # AI-training crawlers allowed in robots.txt (search and AI-answer bots always are).
 config :starter_kit, allowed_training_bots: ~w(GPTBot ClaudeBot Google-Extended CCBot)
 
-config :inertia,
-  endpoint: StarterKitWeb.Endpoint,
-  default_version: "1",
-  camelize_props: true,
-  history: [encrypt: false],
-  ssr: false,
-  raise_on_ssr_failure: config_env() != :prod
-
 config :starter_kit, StarterKit.Mailer, adapter: Swoosh.Adapters.Local
 
 config :starter_kit, StarterKit.Analytics, adapter: :log, raise_on_unknown: true
@@ -133,7 +125,7 @@ config :sentry,
   send_default_pii: false,
   integrations: [oban: [capture_errors: true]]
 
-# Type contract: serializers, routes and Inertia page props → TypeScript
+# Type contract: serializers and routes → TypeScript
 # (docs/TYPE_CONTRACT.md). `mix typelizer.gen` writes; `mix typelizer.check` gates.
 config :typelizer,
   repo: StarterKit.Repo,
@@ -143,8 +135,8 @@ config :typelizer,
     routes: "frontend/src/api/generated/routes",
     pages: nil
   ],
-  # Oban Web: keep its entry page, skip its asset routes.
-  routes: [exclude: ["/dev", "/live", ~r{^/admin/jobs/}E], defaults: [:locale]]
+  # Browser delivery and jobs are outside the JSON API contract.
+  routes: [exclude: ["/dev", "/live", ~r{^/admin/jobs}E, "/*path"], defaults: []]
 
 config :logger, :default_formatter,
   format: "$time $metadata[$level] $message\n",

@@ -44,14 +44,9 @@ import { apiV1SettingsOrganization } from "./apiV1SettingsOrganization";
 import { apiV1SettingsPassword } from "./apiV1SettingsPassword";
 import { apiV1SettingsProfile } from "./apiV1SettingsProfile";
 import { apiV1SettingsSession } from "./apiV1SettingsSession";
-import { dashboard } from "./dashboard";
 import { health } from "./health";
-import { home } from "./home";
-import { localizedHome } from "./localizedHome";
 import { robots } from "./robots";
-import { settingsAppearance } from "./settingsAppearance";
 import { sitemap } from "./sitemap";
-import { webDashboard } from "./webDashboard";
 import { webhooksStripeEvent } from "./webhooksStripeEvent";
 
 export {
@@ -99,14 +94,9 @@ export {
   apiV1SettingsPassword,
   apiV1SettingsProfile,
   apiV1SettingsSession,
-  dashboard,
   health,
-  home,
-  localizedHome,
   robots,
-  settingsAppearance,
   sitemap,
-  webDashboard,
   webhooksStripeEvent,
 };
 export {
@@ -167,13 +157,8 @@ export const routes = {
   apiV1SettingsPassword,
   apiV1SettingsProfile,
   apiV1SettingsSession,
-  dashboard,
   health,
-  home,
-  localizedHome,
   robots,
-  settingsAppearance,
   sitemap,
-  webDashboard,
   webhooksStripeEvent,
 } as const;

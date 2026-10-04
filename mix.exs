@@ -63,7 +63,6 @@ defmodule StarterKit.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      {:inertia, "~> 2.6"},
       {:oban, "~> 2.24"},
       {:oban_web, "~> 2.13"},
       {:hammer, "~> 7.5"},
@@ -105,8 +104,8 @@ defmodule StarterKit.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       "i18n.sync": ["run -e 'IO.inspect(StarterKit.I18n.sync(), label: \"i18n sync\")'"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
-      "assets.build": ["cmd pnpm install --frozen-lockfile", "cmd pnpm build"],
-      "assets.deploy": ["assets.build", "phx.digest"]
+      "frontend.build": ["cmd pnpm install --frozen-lockfile", "cmd pnpm build"],
+      "frontend.deploy": ["frontend.build"]
     ]
   end
 end

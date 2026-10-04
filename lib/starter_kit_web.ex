@@ -1,6 +1,6 @@
 defmodule StarterKitWeb do
   @moduledoc """
-  The web layer: REST controllers rendering Inertia pages or `/api/v1` JSON through
+  The web layer: REST controllers serving `/api/v1` JSON through
   serializers. It calls context APIs only (see docs/ARCHITECTURE.md).
 
       use StarterKitWeb, :controller
@@ -25,7 +25,7 @@ defmodule StarterKitWeb do
       StarterKit.Policy,
       StarterKit.Health
     ],
-    exports: [Endpoint, Telemetry, Vite, RateLimit]
+    exports: [Endpoint, Telemetry, RateLimit]
 
   def static_paths,
     do:
@@ -46,7 +46,6 @@ defmodule StarterKitWeb do
       use Phoenix.Controller, formats: [:html, :json]
 
       import Plug.Conn
-      import Inertia.Controller
       import StarterKitWeb.Authorization
       import StarterKitWeb.Responses
 
@@ -54,7 +53,7 @@ defmodule StarterKitWeb do
 
       unquote(verified_routes())
 
-      # 403/404 raised inside an action render the Inertia error page (ErrorPages).
+      # Policy denials and missing records use the API error envelope.
       def action(conn, _opts),
         do: StarterKitWeb.ErrorPages.call_action(conn, __MODULE__, action_name(conn))
     end
@@ -66,7 +65,6 @@ defmodule StarterKitWeb do
 
       import Phoenix.Controller, only: [get_csrf_token: 0, view_module: 1, view_template: 1]
       import Phoenix.HTML
-      import Inertia.HTML
 
       unquote(verified_routes())
     end

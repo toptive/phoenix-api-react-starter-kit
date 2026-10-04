@@ -6,7 +6,6 @@ defmodule StarterKitWeb.Router do
 
   use StarterKitWeb, :router
 
-  import StarterKitWeb.UserAuth
   import Oban.Web.Router
   import StarterKitWeb.Plugs.BearerAuth, only: [require_authenticated_api_user: 2]
 
@@ -15,22 +14,8 @@ defmodule StarterKitWeb.Router do
   defp require_api_superadmin(conn, opts),
     do: Plugs.BearerAuth.require_superadmin(conn, opts)
 
-  pipeline :browser do
-    plug :accepts, ["html"]
-    plug :fetch_session
-    plug :fetch_flash
-    plug Plugs.XsrfHeader
-    plug :protect_from_forgery
-    plug Plugs.SnakeCaseParams
-    # Strict default; Plugs.SecurityHeaders replaces the CSP with the per-request nonce one.
-    plug :put_secure_browser_headers, %{"content-security-policy" => "default-src 'self'"}
+  pipeline :spa do
     plug Plugs.SecurityHeaders
-    plug :fetch_current_scope_for_user
-    plug Plugs.Locale
-    plug :put_root_layout, html: {StarterKitWeb.Layouts, :root}
-    plug Inertia.Plug
-    plug Typelizer.InertiaPage.ValidateProps
-    plug Plugs.InertiaShare
   end
 
   pipeline :api do
@@ -51,11 +36,6 @@ defmodule StarterKitWeb.Router do
     plug :accepts, ["json"]
   end
 
-  pipeline :authenticated do
-    plug :require_authenticated_user
-    plug Plugs.VerifyAuthorized
-  end
-
   pipeline :api_superadmin do
     plug :require_api_superadmin
   end
@@ -68,10 +48,6 @@ defmodule StarterKitWeb.Router do
     plug :fetch_live_flash
     plug :protect_from_forgery
     plug Plugs.SecurityHeaders
-  end
-
-  pipeline :localized do
-    plug Plugs.PathLocale
   end
 
   # Phoenix's own dev tools (LiveDashboard, mailbox preview): default headers, which
@@ -93,7 +69,7 @@ defmodule StarterKitWeb.Router do
     plug :accepts, ["xml", "txt", "json", "html"]
   end
 
-  # Infrastructure: health check, sitemap, robots (no session, no SSR).
+  # Infrastructure: health check, sitemap, robots (no session).
   scope "/", StarterKitWeb do
     pipe_through :bare
 
@@ -101,25 +77,6 @@ defmodule StarterKitWeb.Router do
     get "/health", HealthController, :show
     get "/sitemap.xml", SitemapController, :show
     get "/robots.txt", RobotsController, :show
-  end
-
-  # Legacy landing views until SPA delivery replaces them: default locale at "/…", other locales at
-  # "/:locale/…" (the localized scope at the END of this file).
-  scope "/", StarterKitWeb do
-    pipe_through [:browser]
-
-    get "/", HomeController, :show
-  end
-
-  # Signed-in app.
-  scope "/", StarterKitWeb do
-    pipe_through [:browser, :authenticated]
-
-    resources "/dashboard", DashboardController, only: [:show], singleton: true
-
-    scope "/settings", Settings, as: :settings do
-      resources "/appearance", AppearanceController, only: [:edit], singleton: true
-    end
   end
 
   scope "/admin" do
@@ -240,16 +197,6 @@ defmodule StarterKitWeb.Router do
     resources "/direct-uploads", DirectUploadController, only: [:create]
   end
 
-  # Localized landing pages: /es… Last on purpose: "/:locale" matches
-  # any single segment, so every other route must be tried first. PathLocale answers
-  # 404 for an unknown locale and redirects the default locale to the unprefixed URL.
-  # The frontend fills :locale through typelizer URL defaults (setUrlDefaults).
-  scope "/:locale", StarterKitWeb, as: :localized do
-    pipe_through [:localized, :browser]
-
-    get "/", HomeController, :show
-  end
-
   if Application.compile_env(:starter_kit, :dev_routes) do
     import Phoenix.LiveDashboard.Router
 
@@ -263,5 +210,11 @@ defmodule StarterKitWeb.Router do
         only: [:index, :show],
         param: "kind"
     end
+  end
+
+  # Reserved backend paths never become browser pages.
+  scope "/", StarterKitWeb do
+    pipe_through :spa
+    get "/*path", SpaController, :show
   end
 end

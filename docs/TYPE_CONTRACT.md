@@ -1,64 +1,48 @@
-# Type contract (typelizer)
+# Type contract
 
-The Elixir side declares the shape of every value sent to React. [typelizer](https://github.com/toptive/typelizer-ex)
-generates the TypeScript from it, so types cannot drift.
-
-| Source | Generates | Import |
-|---|---|---|
-| `lib/starter_kit_web/serializers/*.ex` | `frontend/src/api/generated/serializers/*.ts` | `import type { User } from "@/api/generated/serializers"` |
-| `StarterKitWeb.Router` | `frontend/src/api/generated/routes/*.ts` | `routes.apiV1AuthSession.create().url` |
-
-The pages generator is disabled. Existing Inertia declarations and runtime validation remain
-for unconverted areas; their old `assets/js/generated` output is a compatibility snapshot.
-New API controllers use serializers only. The flat catalogue response type is the generated
-`Locale["translations"]`; bootstrap and auth session data use `Bootstrap` and `AuthSession`.
+Serializers and the Phoenix router are the source of TypeScript types and API route helpers.
+`mix typelizer.gen` writes `frontend/src/api/generated/{serializers,routes}`;
+`mix typelizer.check` rejects drift. Commit the generated output with its source changes.
+Never edit generated files or hand-write mirror response interfaces.
 
 ## Workflow
 
-1. Change a serializer, a route, or a page's props.
-2. `mix typelizer.gen` (the Claude hook runs it after such edits).
-3. Use the new types; commit the generated files with the change.
+1. Change a serializer or API route.
+2. Run `mix typelizer.gen` with the dev database running and migrated (column nullability).
+3. Update React callers and run `pnpm typecheck`, `pnpm lint`, `pnpm test` and `bin/check`.
 
-`mix typelizer.check` fails when the committed files differ (pre-commit, pre-push, `/deploy`).
-It reads column nullability from the dev database (`config :typelizer, repo:`), so the dev DB
-must be up and migrated.
-
-In dev and test (`validate_inertia_props: :values`), `Typelizer.InertiaPage.ValidateProps` raises
-when a rendered page sends a prop that is not declared, misses one, or sends a value that does
-not match its declared type (enums, nullability, serializer fields, nested lists — reported with
-a path such as `memberships[2].role`). Every page has a controller test, so a mismatch fails `mix test`.
+The page generator is disabled. API helper names follow Phoenix's singular helper names:
+`apiV1AuthSession.create().url`, `apiV1SettingsMembership.delete(id).url`.
+The runtime exports `setRoutesBaseUrl`, `setUrlDefaults` and `addUrlDefault`.
+API locale path parameters are required; UI locale is sent in Accept-Language.
+Browser navigation uses the SPA's paths and TanStack Router, not API helpers.
 
 ## Serializers
 
-```elixir
-defmodule StarterKitWeb.Serializers.MembershipSerializer do
-  use Typelizer.Serializer, schema: StarterKit.Organizations.Membership
+Schema attributes infer enums and nullability. Computed values declare their types explicitly:
 
-  attributes [:id, :role, :access, :inserted_at]
-  has_one :user, serializer: StarterKitWeb.Serializers.UserSerializer, nullable: true
-end
+```elixir
+attribute :has_password, type: :boolean, value: &(not is_nil(&1.hashed_password))
+attribute :sales, type: {:enum, [:open, :test, :closed]}
 ```
 
-- Computed values: `attribute :has_password, type: :boolean, value: &(not is_nil(&1.hashed_password))`.
-- A serializer without `schema:` declares a `type:` for each attribute.
-- `Ecto.Enum` fields become literal unions (`"owner" | "admin" | "member"`).
-- Never write a TypeScript interface that mirrors server data by hand.
+`BillingOverview.sales` is a string enum. `DirectUpload` contains `url`, `key`, `method`
+(`"PUT"`) and `headers`; the URL carries its expiry. Dictionary keys retain their spelling.
+`ApiErrorBody`, `FieldError` and generic `Envelope` types are also generated from backend
+transport declarations. The HTTP client selects metadata using the generated `Pagination`
+type. Typelizer's generic `Paginated` uses pageSize; this API uses `meta.pagination.perPage`.
 
-## Routes
+## Helpers consumed outside the SPA
 
-Groups follow the Phoenix helper name: `routes.adminUser.show(id).url`,
-`routes.invitationInvitationAcceptance.create(token).url`, `routes.adminUser.index({ query: compact({ q }) }).url`.
-Excluded: `/dev`, `/live`, Oban Web assets. Never type a path in React.
+Every generated action must have a caller or an entry here; architecture tests enforce this.
+The generator excludes the SPA fallback, `/dev`, `/live` and `/admin/jobs` browser routes.
 
-URL defaults (`config :typelizer, routes: [defaults: [:locale]]`): `:locale` is optional in the
-helper types and filled from the current language (`setUrlDefaults(() => ({ locale: i18n.language }))`
-in `app.tsx`, set per render in `ssr.tsx`): `routes.localizedLegalPage.show("terms").url` →
-`/es/legal/terms`. Add organization-scoped defaults the same way (`addUrlDefault`).
+| Helper | Consumer |
+|---|---|
+| `health.show` | kamal-proxy container health checks |
+| `sitemap.show` | crawlers and public-host reverse proxies |
+| `robots.show` | crawlers and public-host reverse proxies |
+| `apiV1AuthGoogleCallback.create` | Google OAuth redirect, never called by SPA code |
+| `webhooksStripeEvent.create` | Stripe webhook delivery |
 
-Also available since 0.2 and not used by the template yet: typed query params
-(`use Typelizer.Query`) and `Typelizer.Envelope` (`{:paginated, item}` → `Paginated<T>`).
-
-## Dependency
-
-`{:typelizer, "~> 0.2"}` from Hex ([docs](https://hexdocs.pm/typelizer)). Library changes are
-proposed to the typelizer maintainers, never patched locally.
+Typelizer is a Hex dependency (`~> 0.2`). Propose generator changes upstream, never patch it locally.

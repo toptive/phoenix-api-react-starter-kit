@@ -6,7 +6,13 @@ _build
 deps
 node_modules
 priv/static/assets
-priv/ssr
+frontend/dist
+frontend/test-results
+frontend/playwright-report
+priv/static/index.html
+priv/static/*/index.html
+priv/static/*/*/index.html
+priv/static/*/*/*/index.html
 priv/plts
 cover
 tmp

@@ -3,8 +3,7 @@
 The React SPA owns the head for home and published legal pages: title, description,
 canonical, hreflang, Open Graph and JSON-LD. Prerendering is a frontend build concern.
 The API serves `/health`, `/sitemap.xml` and `/robots.txt` directly, without JSON envelopes,
-authentication, cookies or Inertia. Public Inertia caching and server page-view plugs have
-been removed. Canonical-host enforcement and the indexing lock remain in the endpoint.
+authentication or cookies. Canonical-host enforcement and the indexing lock remain in the endpoint.
 
 ## Public origin and locales
 
@@ -47,7 +46,8 @@ get `Disallow: /`. Both open and locked robots responses end with
 on elsewhere. While off, `Plugs.SiteIndexing` adds `X-Robots-Tag: noindex, nofollow` to every
 response, including static files and errors; robots disallows everything and sitemap has
 an empty `urlset`. The SPA's head must also respect its deployment's indexing policy.
-Set `SITE_INDEXING=1` on launch; previews and staging keep it off. Error responses are always
+In `config/deploy.yml`, set `site_indexing = "1"` on launch: it writes both
+`SITE_INDEXING` and the build arg `VITE_SITE_INDEXING`. Previews and staging keep it off. Error responses are always
 noindex and uncacheable (`Plugs.ErrorResponses`).
 
 ## Canonical API host and health
@@ -65,3 +65,13 @@ The DB check is `SELECT 1` with a two-second timeout.
 `test/starter_kit_web/placeholder_test.exs` are skipped for `.template-repo`, then enforce
 product branding after `bin/rename`. Landing performance targets and tuning are described
 in [PERFORMANCE.md](PERFORMANCE.md).
+
+## Static public pages
+
+`pnpm build` prerenders landing pages for every bundled locale. Set `VITE_PUBLIC_URL` and
+`VITE_SITE_INDEXING` for the deployment. Optional `VITE_PRERENDER_API_URL` fetches published
+legal documents during the build; omit it when an API is not yet available. Phoenix serves
+these public paths' own `index.html` files, with the root SPA index as fallback. Browser 404s
+belong to TanStack Router. Hashed assets cache for a year; HTML is private, no-store because
+the inline appearance bootstrap receives a per-request CSP nonce. No Node process runs in
+production. JSON-LD and legal seed scripts are data; only the bootstrap gets an execution nonce.

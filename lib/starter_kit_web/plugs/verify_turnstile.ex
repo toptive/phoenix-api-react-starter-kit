@@ -5,17 +5,15 @@ defmodule StarterKitWeb.Plugs.VerifyTurnstile do
 
       plug StarterKitWeb.Plugs.VerifyTurnstile, "registration" when action == :create
 
-  The API token comes as flat `turnstileToken`; legacy nested params remain supported.
+  The API token comes as flat `turnstileToken`; nested params remain supported.
   A refused check returns 422 validation message keys for API requests before the action
-  runs. Unconverted browser requests redirect to the SPA. Off = no-op.
+  runs. Off = no-op.
   """
 
   @behaviour Plug
 
   import Plug.Conn
-  import Phoenix.Controller, only: [redirect: 2]
   import StarterKitWeb.Authorization, only: [skip_authorization: 1]
-  import StarterKitWeb.Responses, only: [assign_error: 3]
 
   alias StarterKit.AbuseProtection
 
@@ -42,27 +40,17 @@ defmodule StarterKitWeb.Plugs.VerifyTurnstile do
       {:error, :verification_required} ->
         conn = skip_authorization(conn)
 
-        if String.starts_with?(conn.request_path, "/api/") do
-          conn
-          |> StarterKitWeb.Responses.render_error(422, :turnstile_failed, %{
-            turnstile_token: [
-              StarterKit.I18n.field_error(
-                "validation.turnstile_required",
-                %{},
-                StarterKitWeb.Responses.locale(conn)
-              )
-            ]
-          })
-          |> halt()
-        else
-          conn
-          |> assign_error(:turnstile_token, "validation.turnstile_required")
-          |> redirect(external: form_path(action))
-          |> halt()
-        end
+        conn
+        |> StarterKitWeb.Responses.render_error(422, :turnstile_failed, %{
+          turnstile_token: [
+            StarterKit.I18n.field_error(
+              "validation.turnstile_required",
+              %{},
+              StarterKitWeb.Responses.locale(conn)
+            )
+          ]
+        })
+        |> halt()
     end
   end
-
-  defp form_path("registration"), do: StarterKitWeb.ApiAuth.spa_url("/auth/registration")
-  defp form_path("magic_link"), do: StarterKitWeb.ApiAuth.spa_url("/auth/session")
 end

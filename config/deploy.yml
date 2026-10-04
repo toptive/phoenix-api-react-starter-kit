@@ -1,4 +1,8 @@
 <%
+  # One indexing switch controls both the prerendered SPA and the runtime API.
+  site_indexing = "0" # set "1" on launch day
+  raise "site_indexing must be 0 or 1" unless %w[0 1].include?(site_indexing)
+
   # Billing (docs/BILLING.md § Deploy): "off", "test" (only operators can pay, with Stripe
   # test cards) or "live". Every kamal command checks the setup here and stops on a gap, so
   # a deploy never turns billing on without its keys and prices.
@@ -75,15 +79,22 @@ builder:
     # Build-stage BEAM flags (Dockerfile ARG ERL_FLAGS). The amd64 build runs under QEMU on
     # Apple silicon, where the dual-mapped JIT crashes the BEAM: +JMsingle avoids it.
     ERL_FLAGS: "+JMsingle true +S 2:2"
+    VITE_API_URL: ""
+    VITE_PUBLIC_URL: https://CHANGE_ME.example.com
+    VITE_SITE_INDEXING: "<%= site_indexing %>"
+    # VITE_PRERENDER_API_URL: https://CHANGE_ME.example.com
 
 env:
   clear:
     PHX_HOST: CHANGE_ME.example.com
+    PUBLIC_URL: https://CHANGE_ME.example.com
+    API_URL: https://CHANGE_ME.example.com
+    SPA_ORIGIN: https://CHANGE_ME.example.com
     APP_NAME: StarterKit
     POOL_SIZE: 8
     # Indexing lock: "0" = noindex everywhere, robots Disallow: /, empty sitemap.
-    # Set "1" on launch day (docs/SEO.md).
-    SITE_INDEXING: "0"
+    # Controlled by site_indexing at the top of this file (docs/SEO.md).
+    SITE_INDEXING: "<%= site_indexing %>"
     # Who may create an account: invite (only invited emails) until launch, then open.
     # closed = nobody new. The first admin: docs/ADMIN.md (bootstrap_admin).
     SIGNUP_MODE: invite
@@ -93,7 +104,6 @@ env:
     TRUSTED_PROXY_CIDRS: 172.18.0.0/16
     OBAN_DEFAULT_CONCURRENCY: 5
     OBAN_MARKETING_CONCURRENCY: 2
-    SSR_POOL_SIZE: 1
     MAIL_FROM: hello@CHANGE_ME.example.com
     MAIL_FROM_NAME: StarterKit
     # A staging or preview deploy: mail only to these addresses (comma list, *@domain).

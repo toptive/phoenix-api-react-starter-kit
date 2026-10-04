@@ -1,5 +1,5 @@
 defmodule StarterKitWeb.HealthController do
-  @moduledoc "kamal-proxy health check: cheap, no session, no SSR."
+  @moduledoc "kamal-proxy health check: cheap, no session."
   use StarterKitWeb, :controller
 
   def show(conn, _params) do

@@ -32,7 +32,16 @@ config :starter_kit, StarterKitWeb.Endpoint,
   code_reloader: true,
   debug_errors: true,
   secret_key_base: secret_key_base,
-  watchers: [node: ["node_modules/vite/bin/vite.js", cd: Path.expand("..", __DIR__)]]
+  watchers: [
+    pnpm: [
+      "dev",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      System.get_env("VITE_PORT", "5173"),
+      cd: Path.expand("..", __DIR__)
+    ]
+  ]
 
 config :starter_kit, StarterKitWeb.Endpoint,
   live_reload: [
@@ -52,6 +61,3 @@ config :phoenix, :plug_init_mode, :runtime
 config :phoenix_live_view, debug_heex_annotations: true, enable_expensive_runtime_checks: true
 
 config :swoosh, :api_client, false
-
-# Every rendered Inertia page must match its `page` declaration: keys AND values.
-config :typelizer, validate_inertia_props: :values

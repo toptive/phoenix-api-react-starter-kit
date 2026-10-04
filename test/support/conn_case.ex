@@ -1,5 +1,5 @@
 defmodule StarterKitWeb.ConnCase do
-  @moduledoc "Controller tests: a conn, the sandbox, sign-in helpers and Inertia assertions."
+  @moduledoc "Controller tests: a conn, the sandbox, sign-in helpers and API assertions."
 
   use Boundary, top_level?: true, check: [in: false, out: false]
 
@@ -13,7 +13,6 @@ defmodule StarterKitWeb.ConnCase do
 
       import Plug.Conn
       import Phoenix.ConnTest
-      import Inertia.Testing
       import StarterKit.Fixtures
       import StarterKit.FlagHelpers
       import StarterKitWeb.ConnCase
@@ -46,15 +45,5 @@ defmodule StarterKitWeb.ConnCase do
     conn
     |> Phoenix.ConnTest.init_test_session(%{})
     |> Plug.Conn.put_session(:user_token, token)
-  end
-
-  @doc "Sends the request as an Inertia visit (JSON page object)."
-  def inertia(conn) do
-    conn
-    |> Plug.Conn.put_req_header("x-inertia", "true")
-    |> Plug.Conn.put_req_header(
-      "x-inertia-version",
-      Application.get_env(:inertia, :default_version)
-    )
   end
 end

@@ -9,6 +9,17 @@ defmodule StarterKitWeb.StaticFilesTest do
     end
   end
 
+  test "hashed assets have immutable cache headers", %{conn: conn} do
+    name = "test-#{System.unique_integer([:positive])}.js"
+    file = Path.join("priv/static/assets", name)
+    File.mkdir_p!(Path.dirname(file))
+    File.write!(file, "export const ready = true")
+    on_exit(fn -> File.rm!(file) end)
+    result = get(conn, "/assets/" <> name)
+    assert response(result, 200) =~ "ready"
+    assert get_resp_header(result, "cache-control") == ["public, max-age=31536000, immutable"]
+  end
+
   test "the web app manifest lists icons that exist", %{conn: conn} do
     conn = get(conn, "/site.webmanifest")
     manifest = Jason.decode!(conn.resp_body)

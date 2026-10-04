@@ -53,7 +53,7 @@ If the deploy fails, show the output; offer `kamal rollback <previous version>` 
 HOST=$(kamal config | awk '/host:/{print $2; exit}')
 curl -fsS "https://$HOST/health"                      # "ok"
 curl -fsS -o /dev/null -w "%{http_code}\n" "https://$HOST/"       # 200, server-rendered
-curl -fsS "https://$HOST/" | grep -c 'data-server-rendered\|<h1'  # SSR produced HTML
+curl -fsS "https://$HOST/" | grep -c '<h1'  # prerendered landing HTML
 curl -fsS "https://$HOST/sitemap.xml" | head -5
 kamal app details
 kamal app logs --since 5m | grep -iE "error|exception" | tail -20

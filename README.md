@@ -1,31 +1,31 @@
-# Toptive Phoenix + Inertia + React starter kit
+# Toptive Phoenix API + React starter kit
 
-The base every Toptive product starts from: Phoenix 1.8, Inertia, React 19, TypeScript,
-Tailwind v4 and all shadcn components (owned), server-rendered public pages, Oban, one Postgres.
-About 105 MB of memory per app at idle, SSR included.
+Phoenix 1.8 JSON API, React 19 SPA, TypeScript, TanStack Router and React Query, Tailwind v4,
+owned shadcn components, Oban and one PostgreSQL database.
 
-What you get: sign-in (magic link, password, Google), organizations with roles and invitations
-(multi or single tenant), every text translatable and editable at runtime (en + es), an admin
-area (users, organizations, texts, legal documents, audit log, jobs, impersonation), SEO (SSR,
-meta, hreflang, sitemap), a themeable design system, platform modules (analytics, email, AI,
-uploads, error monitoring), generated TypeScript types and routes, 14 local gates, and a Kamal
-deploy.
+Includes bearer sign-in (magic link, password, Google), organizations and invitations,
+runtime translations, admin tools, billing, audit logging, direct uploads, generated API types
+and route helpers, prerendered landing pages, sitemap/robots and Kamal deployment.
 
 ## Start
 
 Requirements: Elixir 1.19 / OTP 28, Node 22, pnpm, PostgreSQL 17.
 
 ```sh
-mix setup          # deps, pnpm install, git hooks, database, seeds
-mix phx.server     # http://localhost:4000 (Vite dev server started for you)
+mix setup          # deps, root pnpm install, git hooks, database, seeds
+mix phx.server     # API on localhost:4000; starts Vite on localhost:5173
 ```
 
-Seeded users: `admin@example.com` / `password1234` (superadmin), `member@example.com` / `password1234`.
-Emails in development: http://localhost:4000/dev/mailbox.
+Open http://localhost:5173 for the SPA during development. Vite proxies `/api` to Phoenix.
+`VITE_PORT`, `PORT` and `VITE_DEV_API_URL` configure parallel local apps.
+Seeded users: `admin@example.com` / `password1234` and `member@example.com` / `password1234`.
+Development emails: http://localhost:4000/dev/mailbox.
 
-`mix check` runs every gate. `SSR=1 mix phx.server` renders public pages on the server in dev.
+`pnpm build` writes the SPA and prerendered public pages to `priv/static`; Phoenix serves
+that output in production. `bin/check` runs every backend and frontend gate through `mix check`.
+`pnpm e2e` runs Playwright separately against the real backend.
 
 ## Documentation
 
-Start with [AGENTS.md](AGENTS.md) (the rules; `CLAUDE.md` links to it), then the documents
-listed at its end. New product: [docs/NEW_PRODUCT.md](docs/NEW_PRODUCT.md).
+[CLAUDE.md](CLAUDE.md) is the rulebook (`AGENTS.md` links to it).
+Start a product with [docs/NEW_PRODUCT.md](docs/NEW_PRODUCT.md).

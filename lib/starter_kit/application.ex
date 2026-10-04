@@ -17,7 +17,6 @@ defmodule StarterKit.Application do
 
   @impl true
   def start(_type, _args) do
-    StarterKitWeb.Vite.load_manifest()
     check_flags!()
 
     children =

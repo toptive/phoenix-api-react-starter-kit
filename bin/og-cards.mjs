@@ -5,7 +5,7 @@
 //   PLAYWRIGHT_MODULE=/path/to/node_modules/playwright bin/og-cards.mjs
 //
 // The card reads the product, not a copy of it: the colours and the font come from
-// assets/css/theme.css, the logo is priv/static/favicon.svg, and the words are `app.name`
+// frontend/src/styles/theme.css, the logo is priv/static/favicon.svg, and the words are `app.name`
 // and `og.tagline` in i18n/locales/<locale>.json. Run it again after a rename, a re-skin or
 // a copy change. Offline tool: needs Playwright (any install; PLAYWRIGHT_MODULE points at it)
 // and ImageMagick (`magick`) to shrink the PNG.
@@ -27,7 +27,7 @@ const locales = fs
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c])
 
 const page = (locale, copy) => `<!doctype html><html lang="${esc(locale)}"><head><meta charset="utf-8">
-<link rel="stylesheet" href="${file("assets/css/theme.css")}">
+<link rel="stylesheet" href="${file("frontend/src/styles/theme.css")}">
 <style>
 @font-face{font-family:"Public Sans Variable";font-weight:100 900;
   src:url(${file("node_modules/@fontsource-variable/public-sans/files/public-sans-latin-wght-normal.woff2")}) format("woff2")}

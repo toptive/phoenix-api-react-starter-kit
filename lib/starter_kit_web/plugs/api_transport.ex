@@ -33,10 +33,18 @@ defmodule StarterKitWeb.Plugs.ApiTransport do
 
   defp wrong_method?(conn) do
     conn.method not in ["GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS"] or
-      (Phoenix.Router.route_info(Router, conn.method, conn.request_path, conn.host) == :error and
+      (not api_route?(conn, conn.method) and
          Enum.any?(["GET", "POST", "PUT", "DELETE"], fn method ->
-           Phoenix.Router.route_info(Router, method, conn.request_path, conn.host) != :error
+           api_route?(conn, method)
          end))
+  end
+
+  defp api_route?(conn, method) do
+    case Phoenix.Router.route_info(Router, method, conn.request_path, conn.host) do
+      %{plug: StarterKitWeb.SpaController} -> false
+      :error -> false
+      _ -> true
+    end
   end
 
   defp parse(conn) do

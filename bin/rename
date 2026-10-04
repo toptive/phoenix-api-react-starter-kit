@@ -43,7 +43,8 @@ replacements = [
   {"StarterKitWeb", "#{module}Web"},
   {"StarterKit", module},
   {"starter_kit", app},
-  {"starter-kit", kebab}
+  {"starter-kit", kebab},
+  {"starterkit", String.replace(app, "_", "")}
 ]
 
 salts = [

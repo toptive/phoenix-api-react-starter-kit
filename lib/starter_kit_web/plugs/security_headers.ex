@@ -18,7 +18,14 @@ defmodule StarterKitWeb.Plugs.SecurityHeaders do
     nonce = 18 |> :crypto.strong_rand_bytes() |> Base.encode64(padding: false)
     vite = Application.get_env(:starter_kit, :vite_dev_server)
     vite_ws = vite && String.replace(vite, ~r/^http/, "ws")
-    extra_connect = Application.get_env(:starter_kit, :csp_connect_src, [])
+
+    extra_connect =
+      [
+        Application.get_env(:starter_kit, :api_origin)
+        | Application.get_env(:starter_kit, :csp_connect_src, [])
+      ]
+      |> Enum.reject(&is_nil/1)
+
     # Turnstile's script and challenge iframe, only while the flag is ON.
     turnstile = if StarterKit.AbuseProtection.required?(), do: "https://challenges.cloudflare.com"
 

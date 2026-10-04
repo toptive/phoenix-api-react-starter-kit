@@ -72,7 +72,7 @@ It returns 202 `EventReceipt { accepted: true }` through the normal envelope, in
 unknown or server-only names. Valid client names are `page_viewed` (`page`, slug ≤80) and
 `cta_clicked` (`cta`, slug ≤40; `page`, slug ≤80). Properties with wrong types or unlisted
 keys are discarded. The endpoint is rate limited to 120 requests/minute per client IP.
-The SPA sends `page_viewed`; the public Inertia page-view plug has been removed.
+The SPA sends `page_viewed` through the events API.
 
 ## Abuse protection
 

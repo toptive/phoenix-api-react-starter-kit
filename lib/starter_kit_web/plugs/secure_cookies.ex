@@ -1,11 +1,10 @@
 defmodule StarterKitWeb.Plugs.SecureCookies do
   @moduledoc """
   Marks every response cookie `Secure` when `config :starter_kit, :secure_cookies` is true
-  (production): the session, remember-me and `XSRF-TOKEN` cookies are never sent over
-  plain HTTP.
+  (production): jobs and dev-tool session cookies are never sent over plain HTTP.
 
   It is the FIRST plug in the endpoint: before-send callbacks run in reverse order, so
-  this one runs last, after `Plug.Session` and Inertia have written their cookies.
+  this one runs last, after `Plug.Session` has written its cookies.
   """
 
   @behaviour Plug

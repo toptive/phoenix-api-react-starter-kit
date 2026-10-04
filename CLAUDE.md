@@ -37,18 +37,18 @@ One Mix project and one `package.json` at the root. Frontend commands run from t
 ## Layout
 
 ```
-lib/starter_kit/                domain — accounts, organizations, i18n, legal, audit, billing, privacy
-lib/starter_kit/<ctx>/          schemas, policies (exported), helper modules and workers (private)
-lib/starter_kit/*.ex            platform modules: analytics, notifications, mailer, ai, uploads, monitoring
-lib/starter_kit_web/            router, REST controllers, serializers, plugs, SEO, SPA delivery
-frontend/src/pages/             SPA pages organized by resource (kebab-case paths)
-frontend/src/components/ui/     shadcn primitives — OWNED, edit them freely
-frontend/src/components/app/    shared app components (FormStepper, FieldHelp, ConfirmDialog, …)
-frontend/src/layouts/           public, auth, app (sidebar), settings, admin
-frontend/src/api/generated/     typelizer output — never edit
-frontend/src/styles/theme.css   the only file a product edits to re-skin
-i18n/                           translations.csv → locales/*.json, scripts
-credo/, test/architecture/      our rules, executable
+lib/starter_kit/            domain — one boundary per context (accounts, organizations, i18n, legal, audit, billing, privacy)
+lib/starter_kit/<ctx>/      schemas, policies (exported), helper modules and workers (private)
+lib/starter_kit/*.ex        platform modules: analytics, notifications, mailer, ai, uploads, monitoring
+lib/starter_kit_web/        router, REST controllers, serializers, plugs, SEO, SPA delivery
+frontend/src/pages/           one React page per controller action (kebab-case paths)
+frontend/src/components/ui/   shadcn primitives — OWNED, edit them freely
+frontend/src/components/app/  shared app components (FormStepper, FieldHelp, ConfirmDialog, …)
+frontend/src/layouts/         public, auth, app (sidebar), settings, admin
+frontend/src/api/generated/   typelizer output — never edit
+frontend/src/styles/theme.css    the only file a product edits to re-skin
+i18n/                       translations.csv → locales/*.json, scripts
+credo/, test/architecture/  our rules, executable
 ```
 
 ## Backend
@@ -65,7 +65,7 @@ credo/, test/architecture/      our rules, executable
   `test/architecture` fails the build. Policies: one module per schema, deny by default.
 - Controllers never touch `Repo`, `Ecto.Query` or changesets (`boundary` + architecture test).
 - API controllers live under `controllers/api/v1`, use opaque bearer sessions, and answer JSON
-  envelopes. Validation details are field → `{key, message, bindings?}` lists. No Inertia declarations.
+  envelopes. Validation details are field → `{key, message, bindings?}` lists.
 
 ### Contexts (STRICT)
 
@@ -99,15 +99,18 @@ hard-code a path. The pages generator is disabled. Details: [docs/TYPE_CONTRACT.
 
 ## Frontend
 
-- React 19, TypeScript strict, Vite, Tailwind v4. SPA data uses React Query through the API
-  client and generated contract. No raw fetch in pages or useEffect for data.
-- Forms use the shared mutation pattern; never react-hook-form.
-- **We own the components.** All shadcn primitives live in `components/ui`; change a look
-  app-wide by editing the component. Repeated patterns become `components/app/*`
-  (never copy-paste between pages).
-- **Theme tokens only**: `bg-primary`, `text-muted-foreground`… Never `text-blue-500` or `#hex`
-  (ESLint fails). New colours are new tokens in `frontend/src/styles/theme.css`.
-- All files and folders kebab-case. Pages mirror controllers: `pages/<resource>/<action>.tsx`.
+- React 19, TypeScript strict, Vite, Tailwind v4; one SPA in `frontend/`, one root `package.json`.
+- TanStack Router guards wait for bootstrap; React Query loads data only through `@/api/hooks`.
+  No `useEffect` for data, no `fetch`/`axios` outside `src/api/http.ts`.
+- Forms use react-hook-form + Zod schemas in `src/schemas`; map server field errors using their
+  i18n keys. Keep `FormStepper`, `FieldHelp` and `ConfirmDialog`.
+- Serializer types and API route helpers live in `frontend/src/api/generated/`; the backend
+  generator owns them. Never add hand-written mirror response types.
+- **We own the components.** Edit `components/ui` for app-wide changes; repeated patterns live
+  in `components/app`. Theme tokens only; new colours go in `frontend/src/styles/theme.css`.
+- Admin Jobs opens the ticket URL returned by the API and appears only with `app.jobsDashboard`.
+- Files and folders are kebab-case (generated files follow the generator). Pages mirror resources:
+  `pages/<resource>/<action>.tsx`. Every UI string comes from `i18n/translations.csv`.
 
 ## UX rules
 
@@ -163,12 +166,12 @@ Details: [docs/DEPLOY.md](docs/DEPLOY.md), [docs/NEW_SERVER.md](docs/NEW_SERVER.
 | i18n | [docs/I18N.md](docs/I18N.md) | CSV, runtime catalogue, admin editor, sync |
 | Admin | [docs/ADMIN.md](docs/ADMIN.md) | superadmin area, legal documents, audit log |
 | Design system | [docs/DESIGN.md](docs/DESIGN.md) | tokens, components, layouts, UX |
-| SEO | [docs/SEO.md](docs/SEO.md) | SSR, meta tags, sitemap, robots |
+| SEO | [docs/SEO.md](docs/SEO.md) | prerendering, meta tags, sitemap, robots |
 | Platform modules | [docs/PLATFORM.md](docs/PLATFORM.md) | analytics, notifications, AI, uploads, monitoring |
 | Billing | [docs/BILLING.md](docs/BILLING.md) | Stripe offers, checkout, webhooks, test vs live keys (OFF by default) |
 | Security | [docs/SECURITY.md](docs/SECURITY.md) | reviews, findings, verified-safe areas |
 | Gates | [docs/GATES.md](docs/GATES.md) | every check, hooks |
-| Performance | [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | memory budget, BEAM/SSR tuning, Lighthouse |
+| Performance | [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | memory budget, BEAM tuning, Lighthouse |
 | Deploy | [docs/DEPLOY.md](docs/DEPLOY.md) | Kamal, image, env, hooks |
 | New server | [docs/NEW_SERVER.md](docs/NEW_SERVER.md) | preparing the product server |
 | New product | [docs/NEW_PRODUCT.md](docs/NEW_PRODUCT.md) | from template to product |

@@ -15,7 +15,7 @@ run() {
 }
 
 ex_files=$(echo "$staged" | grep -E '\.(ex|exs|heex)$' || true)
-ts_files=$(echo "$staged" | grep -E '^assets/js/.*\.(ts|tsx)$' | grep -v '/generated/' || true)
+ts_files=$(echo "$staged" | grep -E '^frontend/.*\.(ts|tsx)$' | grep -v '/generated/' || true)
 
 if [ -n "$ex_files" ]; then
   run "mix format (staged)" mix format --check-formatted $ex_files
@@ -27,12 +27,12 @@ if echo "$staged" | grep -qE '^(lib/starter_kit_web|config)/'; then
   run "type contract (typelizer.check)" mix typelizer.check
 fi
 
-if echo "$staged" | grep -qE '^(lib|assets/js|i18n|config)/'; then
+if echo "$staged" | grep -qE '^(lib|frontend|i18n|config)/'; then
   run "architecture tests" mix test test/architecture
 fi
 
 if [ -n "$ts_files" ]; then
-  run "eslint (staged)" pnpm exec eslint --max-warnings 0 --no-warn-ignored $ts_files
+  run "eslint (staged)" pnpm exec eslint --config frontend/eslint.config.js --max-warnings 0 --no-warn-ignored $ts_files
 fi
 
 if echo "$staged" | grep -q '^i18n/translations.csv$'; then

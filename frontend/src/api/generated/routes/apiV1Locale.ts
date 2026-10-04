@@ -5,10 +5,10 @@ import { buildUrl, type RouteDefinition, type RouteOptions } from "./runtime";
 export const apiV1Locale = {
   /** GET /api/v1/locales/:locale */
   show: (
-    params?: { locale?: string | number },
+    params: { locale: string | number } | string | number,
     options?: RouteOptions,
   ): RouteDefinition<"get"> => ({
-    url: buildUrl("/api/v1/locales/:locale", params ?? {}, options),
+    url: buildUrl("/api/v1/locales/:locale", params, options),
     method: "get",
   }),
 } as const;

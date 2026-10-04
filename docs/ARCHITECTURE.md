@@ -9,7 +9,7 @@ a compiler warning, and `mix compile --warnings-as-errors` fails every gate.
 
 | Boundary | Depends on | Exports |
 |---|---|---|
-| `StarterKitWeb` | contexts, platform modules, `Policy`, `Health` | `Endpoint`, `Telemetry`, `Vite`, `RateLimit` |
+| `StarterKitWeb` | contexts, platform modules, `Policy`, `Health` | `Endpoint`, `Telemetry`, `RateLimit` |
 | `StarterKit.Accounts` | `Repo`, `Schema`, `Policy`, `Audit`, `Notifications` | `User`, `UserToken`, `Scope`, `UserPolicy`, `Impersonation` |
 | `StarterKit.Organizations` | the above + `Accounts` | `Organization`, `Membership`, `Invitation`, their policies |
 | `StarterKit.I18n` | `Repo`, `Schema`, `Policy`, `Audit`, `AI` | `Translation`, `TranslationPolicy` |
@@ -39,10 +39,9 @@ Check it: `mix boundary.spec` prints the graph.
   end
   ```
 
-- Converted controllers live in `controllers/api/v1`; they do not declare Inertia pages.
-  Unconverted areas retain their existing controllers and rendering until conversion.
+- JSON controllers live in `controllers/api/v1` and render through serializers.
 - `StarterKitWeb.ErrorPages` wraps actions: policy denial → 403 `forbidden`, missing record →
-  404 `not_found`, both in the API envelope. Unconverted browser pages keep `errors/show`.
+  404 `not_found`, both in the API envelope.
 - OAuth's imposed GET callback is modelled as `create` on its own resource controller.
   Magic links and email confirmation tokens are spent only by POST.
 
@@ -77,8 +76,7 @@ Inserts and updates of structs are not queries: the context sets `organization_i
 
 Business rules, validation, transactions (`Repo.transact/1` + `with`), notifications,
 auditing and job enqueueing live in the context. Contexts return `{:ok, _}` /
-`{:error, changeset | atom}`; the web layer turns them into flashes, Inertia errors or the JSON
-error envelope.
+`{:error, changeset | atom}`; the web layer turns them into the JSON error envelope.
 
 ## 6. Jobs
 
@@ -89,7 +87,7 @@ lives inside its context and its `perform/1` is ONE call (`credo/worker_perform.
 def perform(%Oban.Job{args: args}), do: Notifications.deliver_now(args)
 ```
 
-Concurrency stays below the DB pool (`POOL_SIZE` 8, jobs 5 + 2). Oban Web at `/admin/oban`.
+Concurrency stays below the DB pool (`POOL_SIZE` 8, jobs 5 + 2). Oban Web at `/admin/jobs`.
 
 ## 7. Responses and the wire
 
@@ -126,13 +124,8 @@ locale/locales/i18nVersion, public flags, app and Turnstile configuration. Perso
 version, and matching `If-None-Match` returns 304. Unknown locales return 404.
 
 Serializers and router helpers generate to `frontend/src/api/generated/{serializers,routes}`.
-The pages generator is disabled. Existing `assets/js/generated` files remain as the unconverted
-frontend's snapshot; new API controllers never use `Typelizer.InertiaPage`.
-
-## 9. Browser pipeline during conversion
-
-Unconverted areas retain `SnakeCaseParams → secure headers + CSP nonce → cookie scope →
-locale → Inertia → ValidateProps → shared props`. Signed-in and superadmin checks stay in place.
-Their sign-in redirects point to the SPA. Browser sessions use the shared digested `sessions` table; their cookie transport is a temporary compatibility layer;
-the new API never accepts them. Remaining browser controllers retain Inertia rendering,
-`page/2` runtime prop validation and form redirects until their conversion.
+The pages generator is disabled. SPA pages and their routing belong to `frontend/src/router.tsx`.
+Phoenix serves `priv/static/index.html` for browser GETs, preferring a public path's prerendered
+`index.html` when present. API, jobs, infrastructure, webhooks and dev paths remain backend routes.
+Hashed assets are immutable for a year; HTML receives a fresh bootstrap nonce and is not cached.
+Oban Web retains LiveView and its restricted session cookie; the API uses bearer tokens only.

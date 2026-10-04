@@ -18,8 +18,8 @@
     {:npm_test, false},
     {:ex_doc, false},
     {:ex_unit, "mix test --warnings-as-errors", env: %{"MIX_ENV" => "test"}},
-    # Type contract drift: generated TypeScript must match the serializers, routes and
-    # page declarations (needs the dev database for column nullability).
+    # Type contract drift: generated TypeScript must match serializers and routes.
+    # Needs the dev database for column nullability.
     {:typelizer, "mix typelizer.check", env: %{"MIX_ENV" => "dev"}},
     {:ts_typecheck, "pnpm typecheck"},
     {:eslint, "pnpm lint"},

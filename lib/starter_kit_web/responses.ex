@@ -1,7 +1,6 @@
 defmodule StarterKitWeb.Responses do
   @moduledoc """
-  Response helpers imported in every controller: translated flash and Inertia errors,
-  the scope shortcut, and the `/api/v1` envelopes.
+  Response helpers imported in every controller: the scope shortcut, translated text and the `/api/v1` envelopes.
   """
 
   import Plug.Conn
@@ -9,13 +8,13 @@ defmodule StarterKitWeb.Responses do
 
   alias StarterKit.I18n
 
-  @doc "SPA sign-in destination for unconverted browser areas."
+  @doc "SPA sign-in destination."
   def spa_sign_in_url, do: StarterKitWeb.ApiAuth.spa_url("/session/new")
 
   @doc "The current scope."
   def scope(conn), do: conn.assigns[:current_scope]
 
-  @doc "The request locale (set by `StarterKitWeb.Plugs.Locale`)."
+  @doc "The request locale (set by `StarterKitWeb.Plugs.ApiLocale`)."
   def locale(conn), do: conn.assigns[:locale] || I18n.default_locale()
 
   @doc "Translates `key` in the request locale."
@@ -24,20 +23,6 @@ defmodule StarterKitWeb.Responses do
   @doc "Puts a translated flash message."
   def put_flash_t(conn, kind, key, bindings \\ %{}),
     do: put_flash(conn, kind, t(conn, key, bindings))
-
-  @doc "Assigns translated changeset errors for the Inertia form (`errors` prop)."
-  def assign_changeset_errors(conn, %Ecto.Changeset{} = changeset) do
-    assign_form_errors(conn, I18n.translate_changeset_errors(changeset, locale(conn)))
-  end
-
-  @doc "Assigns one translated error on `field`."
-  def assign_error(conn, field, key, bindings \\ %{}) do
-    assign_form_errors(conn, %{to_string(field) => t(conn, key, bindings)})
-  end
-
-  # Inertia camelizes the keys (password_confirmation → passwordConfirmation), which
-  # matches the camelCase field names of the React forms.
-  defp assign_form_errors(conn, errors), do: Inertia.Controller.assign_errors(conn, errors)
 
   @doc "Success envelope. Pass a serialized map or `{serializer, value}`."
   def render_data(conn, data, meta \\ %{})
