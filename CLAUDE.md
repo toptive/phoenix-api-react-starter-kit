@@ -4,9 +4,7 @@ Phoenix 1.8 JSON API + React 19 SPA + shadcn, one Postgres, Oban.
 This repository is the **Toptive base template**: every product starts as a copy of it
 (`bin/rename`, then [docs/NEW_PRODUCT.md](docs/NEW_PRODUCT.md)).
 
-One Mix project and one `package.json` at the root. Frontend commands run from the root:
-`pnpm dev` (started by `mix phx.server`), `pnpm build`, `pnpm typecheck`, `pnpm lint`,
-`pnpm test`, `pnpm i18n:build`. Never add a second `package.json` or a workspace.
+One Mix project and one root `package.json`; run all frontend commands from the root, with no second package or workspace.
 
 ## Non-negotiables
 
@@ -27,7 +25,7 @@ One Mix project and one `package.json` at the root. Frontend commands run from t
 ## Language rules (STRICT)
 
 - **UI text is never hard-coded.** `i18n/translations.csv` (`key,en,es`) is the only source.
-  React: `t("ns.key")` (react-i18next). Elixir: `StarterKit.I18n.t/3`, `put_flash_t/3`,
+  React: `t("ns.key")` (react-i18next). Elixir: `StarterKit.I18n.t/3`,
   validation messages as keys (`"validation.email_format"`). Placeholders: `{{name}}` on both sides.
 - Add a key: edit the CSV (English + Spanish), run `pnpm i18n:build`. Fill a new locale with
   `OPENROUTER_API_KEY=… pnpm i18n:translate`. Admins edit any text at runtime in Admin → Texts;
@@ -41,11 +39,13 @@ lib/starter_kit/            domain — one boundary per context (accounts, organ
 lib/starter_kit/<ctx>/      schemas, policies (exported), helper modules and workers (private)
 lib/starter_kit/*.ex        platform modules: analytics, notifications, mailer, ai, uploads, monitoring
 lib/starter_kit_web/        router, REST controllers, serializers, plugs, SEO, SPA delivery
-frontend/src/pages/           one React page per controller action (kebab-case paths)
+frontend/src/pages/           task-oriented pages (kebab-case paths)
 frontend/src/components/ui/   shadcn primitives — OWNED, edit them freely
 frontend/src/components/app/  shared app components (FormStepper, FieldHelp, ConfirmDialog, …)
 frontend/src/layouts/         public, auth, app (sidebar), settings, admin
-frontend/src/api/generated/   typelizer output — never edit
+frontend/src/api/             HTTP transport, hooks and generated type contract
+frontend/e2e/                 browser journeys and per-kit backend fixtures
+frontend/scripts/             build and prerendering scripts
 frontend/src/styles/theme.css    the only file a product edits to re-skin
 i18n/                       translations.csv → locales/*.json, scripts
 credo/, test/architecture/  our rules, executable
@@ -55,7 +55,7 @@ credo/, test/architecture/  our rules, executable
 
 ### Controllers (STRICT)
 
-- **REST actions only**: `index show new create edit update delete`. Any other verb is a nested
+- **REST actions only**: `index show create update delete`. Any other verb is a nested
   resource controller: `POST /admin/users/:user_id/impersonation`, not `impersonate`.
   URLs are resource trees, never verbs. (`credo` check `StarterKit.Credo.RestActions`.)
 - **Skinny**: authorize → cast params → ONE context call → render through serializers and
@@ -99,7 +99,7 @@ hard-code a path. The pages generator is disabled. Details: [docs/TYPE_CONTRACT.
 
 ## Frontend
 
-- React 19, TypeScript strict, Vite, Tailwind v4; one SPA in `frontend/`, one root `package.json`.
+- React 19, TypeScript strict, Vite, Tailwind v4; one SPA in `frontend/`.
 - TanStack Router guards wait for bootstrap; React Query loads data only through `@/api/hooks`.
   No `useEffect` for data, no `fetch`/`axios` outside `src/api/http.ts`.
 - Forms use react-hook-form + Zod schemas in `src/schemas`; map server field errors using their
@@ -135,13 +135,14 @@ hard-code a path. The pages generator is disabled. Details: [docs/TYPE_CONTRACT.
 
 ## Testing & gates
 
-`mix check` runs every gate: compile (`--warnings-as-errors`, `boundary`), format,
+`bin/check` runs the following gates through `mix check`, then isolated Playwright journeys
+through `bin/e2e`: compile (`--warnings-as-errors`, `boundary`), format,
 `credo --strict` (+ our checks), dialyzer, sobelow, `deps.audit`, `hex.audit`, unused deps,
 `mix test` (incl. `test/architecture`), `mix typelizer.check`, `pnpm typecheck`, `pnpm lint`,
 `pnpm test`, `pnpm audit --audit-level=high`.
 
 - **There is no CI.** Four layers: `.claude/hooks/architecture-check` (after each Claude edit),
-  `.githooks/pre-commit` (staged files), `.githooks/pre-push` (`mix check`), `/deploy` (again).
+  `.githooks/pre-commit` (staged files), `.githooks/pre-push` (`bin/check`), `/deploy` (again).
   `mix setup` installs the hooks. Details: [docs/GATES.md](docs/GATES.md).
 - Test behavior through HTTP API requests: success, validation, unauthorized, forbidden and tenant
   isolation outcomes, plus end-to-end flows. Context tests cover real branching only; no tests of

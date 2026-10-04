@@ -31,7 +31,7 @@ test("request a magic link, sign in, sign out and refuse a used link", async ({ 
   await page.getByLabel(text("fields.email"), { exact: true }).fill(user.user.email)
   await page.getByRole("button", { name: text("auth.session.send_link"), exact: true }).click()
   await expect(page).toHaveURL(/\/session\/check-your-email/)
-  const path = await api.mailLink(user.user.email, "/magic-links/", [user.magicPath])
+  const path = await api.mailLink(user.user.email, "/magic-links/")
   await page.goto(path)
   await page.getByRole("button", { name: text("auth.magic_link.submit"), exact: true }).click()
   await expect(page).toHaveURL(/\/dashboard$/)

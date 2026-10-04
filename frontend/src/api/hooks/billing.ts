@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api, ApiError } from "../http"
 import {
   apiV1SettingsBilling,
-  apiV1SettingsBillingCheckoutSession,
-  apiV1SettingsBillingPortalSession,
+  apiV1SettingsBillingCheckoutSessions,
+  apiV1SettingsBillingPortalSessions,
 } from "../generated/routes"
 import type { BillingOverview, RedirectUrl } from "../generated/serializers"
 import { useAppConfig } from "./bootstrap"
@@ -26,7 +26,7 @@ export function useCheckout() {
   const { auth } = useAppConfig()
   return useMutation({
     mutationFn: async (input: CheckoutInput) =>
-      (await api.post<RedirectUrl>(apiV1SettingsBillingCheckoutSession.create(), input)).data,
+      (await api.post<RedirectUrl>(apiV1SettingsBillingCheckoutSessions.create(), input)).data,
     onSuccess: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: qk.organization(auth!.organization.id, "billing") }),
@@ -43,7 +43,7 @@ export function useBillingPortal() {
   const qc = useQueryClient()
   const { auth } = useAppConfig()
   return useMutation({
-    mutationFn: async () => (await api.post<RedirectUrl>(apiV1SettingsBillingPortalSession.create())).data,
+    mutationFn: async () => (await api.post<RedirectUrl>(apiV1SettingsBillingPortalSessions.create())).data,
     onSuccess: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: qk.organization(auth!.organization.id, "billing") }),

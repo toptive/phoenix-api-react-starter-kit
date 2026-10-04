@@ -3,7 +3,7 @@
 Green before every commit and every push. There is no CI: these ARE the CI.
 When a gate fails, fix the code — never weaken the gate, never add a todo list of violations.
 
-## `mix check` (ex_check, `.check.exs`)
+## `bin/check` (Mix gates via ex_check, then Playwright)
 
 | Gate | Command | Catches |
 |---|---|---|
@@ -15,12 +15,12 @@ When a gate fails, fix the code — never weaken the gate, never add a todo list
 | mix_audit | `mix deps.audit` | vulnerable Hex packages |
 | hex_audit | `mix hex.audit` | retired packages |
 | unused_deps | `mix deps.unlock --check-unused` | lockfile hygiene |
-| ex_unit | `mix test` | tests, incl. `test/architecture` |
+| ex_unit | `mix test` | tests, incl. `test/architecture` and typelizer prop validation |
 | typelizer | `mix typelizer.check` | generated TypeScript out of date |
 | ts_typecheck | `pnpm typecheck` | TypeScript strict |
 | eslint | `pnpm lint` | hard-coded colours, literal UI text, direct fetch/axios, hooks rules, catalogue completeness |
 | vitest | `pnpm test` | pure functions and HTTP envelope handling |
-| playwright (separate command) | `pnpm e2e` | browser journeys against the real kit API; not yet included in `bin/check` |
+| playwright | `bin/e2e` (runs `pnpm e2e`) | browser journeys against the isolated real API |
 | pnpm_audit | `pnpm audit --audit-level=high` | vulnerable npm packages |
 
 ## Architecture tests (`test/architecture`)
@@ -32,8 +32,9 @@ When a gate fails, fix the code — never weaken the gate, never add a todo list
 - every tenant schema has an isolation test;
 - web code never touches `Repo`, `Ecto.Query` or changesets;
 - React files are kebab-case; every static i18n key exists in the CSV;
-- every SPA page has a route or error component in `frontend/src/router.tsx`;
-- every generated API route action has a caller or a documented external consumer.
+- every rendered page exists and every page is rendered;
+- every `render_public` page is reachable by the SSR page glob (tests render without SSR, so a
+  missing page fails only in production with a 500).
 
 ## Where they run
 
@@ -42,7 +43,7 @@ When a gate fails, fix the code — never weaken the gate, never add a todo list
    ESLint on React files, locale build on CSV changes). Wired in `.claude/settings.json`.
 2. `.githooks/pre-commit` — staged files: format, compile, credo, typelizer.check, architecture
    tests, ESLint, i18n build.
-3. `.githooks/pre-push` — `bin/check` (`mix check --no-retry`). A push that only deletes branches skips
+3. `.githooks/pre-push` — `bin/check` (`mix check --no-retry`, then `bin/e2e`). A push that only deletes branches skips
    it. The hook unsets Git's repository-local variables first, so tools that run git elsewhere (the
    advisory DB) work.
 4. `/deploy` skill and the Kamal `pre-build` hook — `bin/check` again; the build refuses to start on a
@@ -82,66 +83,26 @@ Postgres allows 100 connections. Keep `POOL_SIZE` small (2–5) when several lan
 
 ## Browser journeys against the kit API
 
-Prefer end-to-end behavior tests: backend requests exercise the real router, auth, policies,
-database and serializers; SPA journeys use Chromium in `frontend/e2e/`. Vitest is for pure
-functions and HTTP envelope handling. Do not render components against mocked APIs.
-The browser suite never intercepts or replaces `/api/v1` responses. External services such
-as Stripe and AI are stubbed at the backend's upstream HTTP boundary.
+`bin/check` runs `bin/e2e` after all Mix and frontend gates; pre-push runs the same command.
+Install Chromium once with `pnpm exec playwright install chromium`. `bin/e2e` creates and
+migrates `starter_kit_e2e`, boots `MIX_ENV=test E2E=1` on port 4100 with ordinary DB connections,
+a separate `_build/e2e` build, local mailbox, Turnstile off and AI unconfigured, runs `pnpm e2e`, and stops the API on exit.
+Override `E2E_PGDATABASE` (must contain `e2e`) or `E2E_PORT` for another local lane.
 
-Install once with `pnpm exec playwright install chromium`. Run `pnpm e2e` from the root;
-`pnpm e2e:ui` opens Playwright's UI. Playwright starts and stops Vite on 5173 with a proxy to
-`E2E_API_URL` (default `http://localhost:4100`). Setting `E2E_BASE_URL` uses an already running
-SPA instead. That SPA must point to the same API. Failure traces and screenshots are in
-`frontend/test-results/`; the HTML report is in `frontend/playwright-report/` (both ignored).
+Playwright owns Vite on 5173; `E2E_BASE_URL` selects an existing SPA. The browser suite uses
+real API responses. When `frontend/e2e/stripe-stub.mjs` exists, the runner enables billing and
+points Stripe HTTP at `E2E_STRIPE_URL` (default `http://localhost:4200/v1/`); global setup owns
+the stub. Without it only billing journeys skip. Traces and reports live in
+`frontend/test-results/` and `frontend/playwright-report/` (ignored).
 
-The API must be running first. For the Phoenix API kit, the development fallback is:
+`frontend/e2e/backend.ts` is the per-kit seam: `seedUser` creates confirmed fixture accounts
+and bearers, bootstraps the first superadmin through `Accounts.bootstrap_superadmin`,
+`expireSudo` expires a session, and `sendOptionalEmail` queues mail for the running API.
+These use isolated `mix run` processes; user journeys still exercise the API. Global setup
+clears the mailbox once. `E2E_API_DIR` defaults to this checkout.
 
-```sh
-cd /path/to/phoenix-api-react-starter-kit
-PGDATABASE=starter_kit_e2e mix ecto.create
-PGDATABASE=starter_kit_e2e mix ecto.migrate
-PGDATABASE=starter_kit_e2e PORT=4100 VITE_PORT=5199 SPA_ORIGIN=http://localhost:5173 MAIL_ADAPTER=local mix phx.server
-```
-
-`config/dev.exs` reads `PGDATABASE`, `PORT` and `VITE_PORT`; `runtime.exs` reads `SPA_ORIGIN`.
-The dev mailer already uses Swoosh Local (the current kit does not read `MAIL_ADAPTER`).
-`/dev/mailbox/json` returns recipient, text and HTML bodies; fixtures poll it to obtain
-single-use links. Set `E2E_MAILBOX_PATH` for another kit's equivalent test mailbox. Users,
-confirmation, onboarding and password setup all go through generated API routes. Fixtures
-respect rate limits and their real `Retry-After`; they create unique addresses per test.
-
-The only direct database fixture adjustments are expiring a test session's sudo window
-(to exercise a real 403 without waiting ten minutes) and promoting a test account when
-admin journeys are enabled. They use `psql` and `E2E_PGDATABASE` (default `starter_kit_e2e`),
-with the normal local `PGHOST`/`PGPORT`/`PGUSER`/`PGPASSWORD` settings. A database name must
-contain `e2e` or `test`. Other kits should replace these two fixtures with their test helper;
-do not bypass registration or business actions. The unsubscribe journey queues a real optional
-notification through the Phoenix public context from a small `mix run --no-start` process
-with queues disabled; the running API delivers it to the mailbox. Set `E2E_API_DIR` to that
-checkout (default: the sibling Phoenix API kit used during SPA development). Other backend
-lanes replace this mail arrangement with their equivalent test helper. The browser still
-previews and opts out through the public API.
-
-Each backend lane wires this into its `bin/check` after request tests and frontend gates:
-create and migrate a dedicated E2E database; boot the API in test mode on 4100 with the local
-mailbox, HTTP stubs and normal DB connections available across requests; wait for `/health`;
-run `E2E_API_URL=http://localhost:4100 E2E_PGDATABASE=<isolated-db> pnpm e2e`; stop the API in
-an EXIT/INT/TERM trap, including on test failure. A Phoenix test server needs its test
-configuration to read the chosen port/database, enable test mailbox routes, start the
-endpoint and allow browser requests through its sandbox. The current backend test config
-is not yet a standalone E2E server; the commands above run in development until that lane
-lands. API boot is deliberately owned by `bin/check`, rather than a SPA script tied to Mix.
-
-Admin journeys (texts edit/fill, impersonation/back, legal publication, audit and Jobs) have
-explicit `test.skip` reasons while the Phoenix admin lane is in progress. Set `E2E_ADMIN=1`
-when it has landed, with the backend's fake AI HTTP adapter for Fill. Billing checkout and
-portal journeys use `E2E_BILLING=1` once the billing API lane supplies Stripe test HTTP stubs
-and subscription fixtures. Skips are reported and must be removed or enabled in those lanes.
-
-`pnpm i18n:audit` checks English and Spanish, frontend key references, backend references,
-dynamic namespaces and plural variants. `pnpm lint` runs it as a gate. To remove genuinely
-unused keys, run `node i18n/scripts/audit.mjs --prune`, review the CSV diff, then
-`pnpm i18n:build`. Runtime and backend text must stay in the shared catalogue.
+`pnpm lint` includes the catalogue audit. Prune unused keys with
+`node i18n/scripts/audit.mjs --prune`, review the diff, then run `pnpm i18n:build`.
 
 ## Testing policy
 

@@ -34,7 +34,7 @@ for (const method of ["password", "magic link"] as const) {
         .click()
     } else {
       await dialog.getByRole("button", { name: text("auth.session.send_link"), exact: true }).click()
-      const path = await api.mailLink(user.user.email, "/magic-links/", [user.magicPath])
+      const path = await api.mailLink(user.user.email, "/magic-links/")
       await dialog.getByLabel(text("auth.sudo.link_label"), { exact: true }).fill(`http://localhost:5173${path}`)
       await dialog.getByRole("button", { name: text("auth.sudo.confirm"), exact: true }).click()
     }

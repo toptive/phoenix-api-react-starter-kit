@@ -20,10 +20,6 @@ defmodule StarterKitWeb.Responses do
   @doc "Translates `key` in the request locale."
   def t(conn, key, bindings \\ %{}), do: I18n.t(key, bindings, locale(conn))
 
-  @doc "Puts a translated flash message."
-  def put_flash_t(conn, kind, key, bindings \\ %{}),
-    do: put_flash(conn, kind, t(conn, key, bindings))
-
   @doc "Success envelope. Pass a serialized map or `{serializer, value}`."
   def render_data(conn, data, meta \\ %{})
 

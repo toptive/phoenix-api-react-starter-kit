@@ -12,7 +12,7 @@ import {
   ADMIN_TOKEN_KEY,
   setUnauthorizedHandler,
 } from "./http"
-import { apiV1Bootstrap, apiV1AuthSession, apiV1AuthSudo, apiV1Locale } from "./generated/routes"
+import { apiV1Bootstrap, apiV1AuthSessions, apiV1AuthSudo, apiV1Locales } from "./generated/routes"
 import { i18n } from "@/i18n"
 
 vi.mock("@/lib/api-failure", () => ({ reportApiFailure: vi.fn() }))
@@ -65,7 +65,7 @@ describe("HTTP transport", () => {
     fetchStub.mockResolvedValue(
       Response.json({ error: { code: "validation_failed", message: "Fix the form", details } }, { status: 422 }),
     )
-    await expect(api.post(apiV1AuthSession.create(), { email: "a@b.com", password: "short" })).rejects.toMatchObject({
+    await expect(api.post(apiV1AuthSessions.create(), { email: "a@b.com", password: "short" })).rejects.toMatchObject({
       name: "ApiError",
       status: 422,
       code: "validation_failed",
@@ -106,7 +106,7 @@ describe("HTTP transport", () => {
     fetchStub.mockResolvedValue(
       Response.json({ error: { code: "invalid_credentials", message: "Try again", details: {} } }, { status: 401 }),
     )
-    await expect(api.post(apiV1AuthSession.create(), {}, { anonymous: true })).rejects.toMatchObject({ status: 401 })
+    await expect(api.post(apiV1AuthSessions.create(), {}, { anonymous: true })).rejects.toMatchObject({ status: 401 })
     expect(getToken()).toBe("existing")
     expect(redirect).not.toHaveBeenCalled()
     expect(fetchStub.mock.calls[0]?.[1]?.headers).not.toHaveProperty("Authorization")
@@ -128,9 +128,11 @@ describe("HTTP transport", () => {
     for (const [status, code] of [
       [403, "sudo_required"],
       [503, "email_unavailable"],
+      [503, "ai_not_configured"],
+      [503, "ai_unavailable"],
     ] as const) {
       fetchStub.mockResolvedValue(Response.json({ error: { code, message: "Try again", details: {} } }, { status }))
-      await expect(api.post(apiV1AuthSession.create())).rejects.toMatchObject({ code, status })
+      await expect(api.post(apiV1AuthSessions.create())).rejects.toMatchObject({ code, status })
     }
     expect(reportApiFailure).not.toHaveBeenCalled()
   })
@@ -138,18 +140,20 @@ describe("HTTP transport", () => {
     fetchStub.mockResolvedValue(
       Response.json(
         { error: { code: "rate_limited", message: "Wait a moment", details: { retryAfter: 30 } } },
-        { status: 429 },
+        { status: 429, headers: { "Retry-After": "30" } },
       ),
     )
     await expect(api.get(apiV1Bootstrap.show())).rejects.toMatchObject({ status: 429 })
-    expect(toast.error).toHaveBeenCalledWith("Wait a moment")
+    expect(toast.error).toHaveBeenCalledWith("Wait a moment", {
+      description: i18n.t("errors.retry_after", { count: 30 }),
+    })
   })
   it("accepts empty 204 and conditional 304 responses", async () => {
     fetchStub
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(new Response(null, { status: 304 }))
-    expect(await api.del(apiV1AuthSession.delete())).toEqual({ data: undefined })
-    expect(await api.get(apiV1Locale.show("en"))).toEqual({ data: undefined })
+    expect(await api.del(apiV1AuthSessions.destroy())).toEqual({ data: undefined })
+    expect(await api.get(apiV1Locales.show("en"))).toEqual({ data: undefined })
   })
   it("maps non-JSON failures rather than leaking a parser error", async () => {
     fetchStub.mockResolvedValue(new Response("Proxy failure", { status: 500 }))

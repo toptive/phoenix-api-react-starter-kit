@@ -1,0 +1,7 @@
+{
+  "semi": false,
+  "printWidth": 120,
+  "trailingComma": "all",
+  "plugins": ["prettier-plugin-tailwindcss"],
+  "tailwindStylesheet": "./src/styles/app.css"
+}

@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api, clearTokens } from "../http"
 import {
   apiV1SettingsProfile,
-  apiV1SettingsEmailPreference,
-  apiV1SettingsSession,
+  apiV1SettingsEmailPreferences,
+  apiV1SettingsSessions,
   apiV1SettingsEmail,
   apiV1SettingsPassword,
   apiV1SettingsAccount,
@@ -39,7 +39,7 @@ export function useEmailPreferences() {
   return useQuery({
     queryKey: qk.emailPreferences,
     queryFn: async ({ signal }) =>
-      (await api.get<EmailPreferences>(apiV1SettingsEmailPreference.show(), { signal })).data,
+      (await api.get<EmailPreferences>(apiV1SettingsEmailPreferences.show(), { signal })).data,
     retry: false,
   })
 }
@@ -47,7 +47,7 @@ export function useUpdateEmailPreferences() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (input: EmailPreferencesInput) =>
-      (await api.put<EmailPreferences>(apiV1SettingsEmailPreference.update(), input)).data,
+      (await api.put<EmailPreferences>(apiV1SettingsEmailPreferences.update(), input)).data,
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: qk.emailPreferences })
     },
@@ -56,7 +56,7 @@ export function useUpdateEmailPreferences() {
 export function useSessions() {
   return useQuery({
     queryKey: qk.sessions,
-    queryFn: async ({ signal }) => (await api.get<Session[]>(apiV1SettingsSession.index(), { signal })).data,
+    queryFn: async ({ signal }) => (await api.get<Session[]>(apiV1SettingsSessions.index(), { signal })).data,
     retry: false,
   })
 }
@@ -65,7 +65,7 @@ export function useRevokeSession() {
   const { auth } = useAppConfig()
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.del(apiV1SettingsSession.delete(id))
+      await api.del(apiV1SettingsSessions.destroy(id))
       return id
     },
     onSuccess: async (id) => {
@@ -109,7 +109,7 @@ export function useDeleteAccount() {
   return useMutation({
     mutationFn: () =>
       withSudo(async () => {
-        await api.del(apiV1SettingsAccount.delete())
+        await api.del(apiV1SettingsAccount.destroy())
       }),
     onSuccess: async () => {
       clearTokens()

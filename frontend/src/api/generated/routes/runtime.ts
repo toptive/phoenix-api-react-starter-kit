@@ -23,7 +23,7 @@ let urlDefaults: UrlDefaults | (() => UrlDefaults) = {};
  * Prefixes every generated URL with an origin, for example
  * "https://app.example.com". Pass "" to go back to relative URLs.
  */
-export function setRoutesBaseUrl(url: string): void {
+export function setBaseUrl(url: string): void {
   routesBaseUrl = url.replace(/\/+$/, "");
 }
 

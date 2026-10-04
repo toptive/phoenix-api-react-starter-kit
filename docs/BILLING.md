@@ -133,8 +133,7 @@ subscriptions pass through typelizer serializers; Stripe ids never reach the SPA
 
 `BillingOverview` carries `plan`, nullable `subscription`, configured `offers`,
 `offerRevision`, `sales` (`"open" | "test" | "closed"`), and `canManage`. Sales status is `open` in
-live mode, `test` for test operators, or `closed`. `testMode` describes the deployment
-mode even when sales are closed. A manager is an owner/admin with full access; other
+live mode, `test` for test operators, or `closed`. The `test` value tells the SPA to show the test-mode banner. A manager is an owner/admin with full access; other
 members can read the overview. An organization with an existing subscription can read
 it and open the portal while the billing flag is off.
 

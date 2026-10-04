@@ -23,9 +23,9 @@ while IFS= read -r name; do
   unset "$name"
 done < <(git rev-parse --local-env-vars)
 
-# mix check includes `mix typelizer.check` (the type contract). bin/check also writes the
-# gate stamp that lets the Kamal pre-build hook skip a second run for the same commit.
-echo "→ mix check (all gates)"
+# bin/check runs mix check (including the type contract), then isolated Playwright.
+# It also writes the gate stamp that lets the Kamal pre-build hook skip a second run for the same commit.
+echo "→ bin/check (all gates, including browser journeys)"
 if ! bin/check; then
   echo ""
   echo "✗ pre-push failed. Fix the failing gate above, then push again."

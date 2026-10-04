@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query"
 import { api } from "../http"
-import { apiV1Organization, apiV1Onboarding, apiV1Invitation, apiV1InvitationAcceptance } from "../generated/routes"
+import { apiV1Organizations, apiV1Onboarding, apiV1Invitations, apiV1InvitationsAcceptance } from "../generated/routes"
 import type { Organization, Onboarding, InvitationPreview, Membership, Bootstrap } from "../generated/serializers"
 import { qk } from "../query-keys"
 import { useAppConfig } from "./bootstrap"
@@ -20,7 +20,7 @@ export function useCreateOrganization() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (input: OrganizationInput) =>
-      (await api.post<Organization>(apiV1Organization.create(), input)).data,
+      (await api.post<Organization>(apiV1Organizations.create(), input)).data,
     onSuccess: () => refreshOrganization(qc),
   })
 }
@@ -43,7 +43,7 @@ export function useInvitation(token: string) {
   const { auth } = useAppConfig()
   return useQuery({
     queryKey: qk.invitation(token, auth?.user.id ?? "guest"),
-    queryFn: async ({ signal }) => (await api.get<InvitationPreview>(apiV1Invitation.show(token), { signal })).data,
+    queryFn: async ({ signal }) => (await api.get<InvitationPreview>(apiV1Invitations.show(token), { signal })).data,
     enabled: Boolean(token),
     retry: false,
     gcTime: 0,
@@ -52,7 +52,7 @@ export function useInvitation(token: string) {
 export function useAcceptInvitation() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (token: string) => (await api.post<Membership>(apiV1InvitationAcceptance.create(token))).data,
+    mutationFn: async (token: string) => (await api.post<Membership>(apiV1InvitationsAcceptance.create(token))).data,
     onSuccess: () => refreshOrganization(qc),
   })
 }

@@ -69,7 +69,7 @@ defmodule StarterKit.FrontendRulesTest do
       |> Enum.map_join("\n", &File.read!/1)
 
     documented = File.read!("docs/TYPE_CONTRACT.md")
-    routes = Path.wildcard("frontend/src/api/generated/routes/*.ts")
+    routes = Path.wildcard("frontend/src/api/generated/routes/**/*.ts")
     assert length(routes) > 2
 
     for path <- routes,
@@ -82,7 +82,7 @@ defmodule StarterKit.FrontendRulesTest do
 
   test "SPA delivery is excluded from the generated API routes" do
     routes =
-      Path.wildcard("frontend/src/api/generated/routes/*.ts") |> Enum.map_join("", &File.read!/1)
+      Path.wildcard("frontend/src/api/generated/routes/**/*.ts") |> Enum.map_join("", &File.read!/1)
 
     refute routes =~ "/*path"
     refute routes =~ ~r/buildUrl\(\s*"\/admin\/jobs/

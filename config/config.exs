@@ -136,7 +136,11 @@ config :typelizer,
     pages: nil
   ],
   # Browser delivery and jobs are outside the JSON API contract.
-  routes: [exclude: ["/dev", "/live", ~r{^/admin/jobs}E, "/*path"], defaults: []]
+  routes: [
+    naming: :controller_path,
+    exclude: ["/dev", "/live", ~r{^/admin/jobs}E, "/*path"],
+    defaults: []
+  ]
 
 config :logger, :default_formatter,
   format: "$time $metadata[$level] $message\n",

@@ -5,16 +5,16 @@ test("a mailed unsubscribe link previews safely, then opts out without signing i
   const path = await api.mailLink(user.user.email, "/email-subscriptions/")
   await page.goto(path)
   await expect(page.getByRole("heading", { name: text("email_opt_out.title"), exact: true })).toBeVisible()
-  expect(await api.call(routes.apiV1SettingsEmailPreference.show(), undefined, user.token)).toEqual({
+  expect(await api.call(routes.apiV1SettingsEmailPreferences.show(), undefined, user.token)).toEqual({
     optionalEmails: true,
   })
   await page.reload()
-  expect(await api.call(routes.apiV1SettingsEmailPreference.show(), undefined, user.token)).toEqual({
+  expect(await api.call(routes.apiV1SettingsEmailPreferences.show(), undefined, user.token)).toEqual({
     optionalEmails: true,
   })
   await page.getByRole("button", { name: text("email_opt_out.submit"), exact: true }).click()
   await expect(page.getByRole("heading", { name: text("email_opt_out.done_title"), exact: true })).toBeVisible()
-  expect(await api.call(routes.apiV1SettingsEmailPreference.show(), undefined, user.token)).toEqual({
+  expect(await api.call(routes.apiV1SettingsEmailPreferences.show(), undefined, user.token)).toEqual({
     optionalEmails: false,
   })
   await page.reload()

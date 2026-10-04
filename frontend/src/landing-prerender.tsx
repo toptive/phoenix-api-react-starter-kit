@@ -11,7 +11,7 @@ import {
 } from "@tanstack/react-router"
 import { createI18n, bundledLocales } from "@/i18n"
 import LegalShow from "@/pages/legal/show"
-import { apiV1LegalPage } from "@/api/generated/routes"
+import { apiV1LegalPages } from "@/api/generated/routes"
 import type { LegalPage } from "@/api/generated/serializers"
 import type { Bootstrap } from "@/api/generated/serializers"
 import { qk } from "@/api/query-keys"
@@ -71,4 +71,4 @@ export async function render(locale = "en", legalPage?: LegalPage, pathname?: st
   return html
 }
 
-export const legalPageUrl = (slug: string, locale: string) => apiV1LegalPage.show(slug, { query: { locale } }).url
+export const legalPageUrl = (slug: string, locale: string) => apiV1LegalPages.show(slug, { query: { locale } }).url

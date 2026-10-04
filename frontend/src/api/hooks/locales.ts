@@ -1,6 +1,6 @@
 import { queryOptions, useQuery } from "@tanstack/react-query"
 import { api } from "../http"
-import { apiV1Locale } from "../generated/routes"
+import { apiV1Locales } from "../generated/routes"
 import { qk } from "../query-keys"
 import { applyTranslations, i18n } from "@/i18n"
 import { storageKey } from "@/lib/storage-keys"
@@ -22,7 +22,7 @@ export const localeOptions = (locale: string, version: string) =>
     queryKey: qk.locale(locale, version),
     queryFn: async ({ signal }) => {
       const previous = readCatalogue(locale)
-      const result = await api.get<Record<string, string>>(apiV1Locale.show(locale), {
+      const result = await api.get<Record<string, string>>(apiV1Locales.show(locale), {
         signal,
         ...(previous ? { headers: { "If-None-Match": previous.etag } } : {}),
       })

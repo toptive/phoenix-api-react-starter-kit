@@ -37,7 +37,7 @@ test("signed-out invitation preserves the return path through sign-in and joins 
       (await api.bootstrap(user.token)).auth!.organization.id,
     )
     await page.reload()
-    expect(await api.call(routes.apiV1SettingsInvitation.index(), undefined, user.token)).toEqual([])
+    expect(await api.call(routes.apiV1SettingsInvitations.index(), undefined, user.token)).toEqual([])
   } finally {
     await context.close()
   }

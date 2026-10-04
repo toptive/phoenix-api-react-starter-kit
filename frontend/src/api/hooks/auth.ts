@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query"
 import { api, setToken, clearTokens, ADMIN_TOKEN_KEY } from "../http"
 import {
-  apiV1AuthSession,
-  apiV1AuthMagicLink,
-  apiV1AuthMagicLinkSession,
-  apiV1AuthRegistration,
+  apiV1AuthSessions,
+  apiV1AuthMagicLinks,
+  apiV1AuthMagicLinksSessions,
+  apiV1AuthRegistrations,
   apiV1AuthSudo,
   apiV1AuthGoogleStart,
-  apiV1SettingsEmailConfirmation,
+  apiV1SettingsEmailConfirmations,
   apiV1CurrentOrganization,
   apiV1AuthImpersonation,
 } from "../generated/routes"
@@ -39,7 +39,7 @@ export function useSignIn() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (input: SignInInput) =>
-      (await api.post<AuthSession>(apiV1AuthSession.create(), input, { anonymous: true })).data,
+      (await api.post<AuthSession>(apiV1AuthSessions.create(), input, { anonymous: true })).data,
     onSuccess: (session) => acceptSession(qc, session),
   })
 }
@@ -47,17 +47,17 @@ export const useCurrentUser = () => useBootstrap().data?.auth?.user ?? null
 export const useRequestMagicLink = () =>
   useMutation({
     mutationFn: async (input: MagicLinkInput) =>
-      (await api.post<MagicLinkRequest>(apiV1AuthMagicLink.create(), input)).data,
+      (await api.post<MagicLinkRequest>(apiV1AuthMagicLinks.create(), input)).data,
   })
 export const useRegister = () =>
   useMutation({
     mutationFn: async (input: RegistrationInput) =>
-      (await api.post<MagicLinkRequest>(apiV1AuthRegistration.create(), input)).data,
+      (await api.post<MagicLinkRequest>(apiV1AuthRegistrations.create(), input)).data,
   })
 export function useMagicLink(token: string) {
   return useQuery({
     queryKey: qk.magicLink(token),
-    queryFn: async () => (await api.get<MagicLink>(apiV1AuthMagicLink.show(token))).data,
+    queryFn: async () => (await api.get<MagicLink>(apiV1AuthMagicLinks.show(token))).data,
     enabled: Boolean(token),
     retry: false,
     gcTime: 0,
@@ -66,7 +66,7 @@ export function useMagicLink(token: string) {
 export function useConsumeMagicLink() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (token: string) => (await api.post<AuthSession>(apiV1AuthMagicLinkSession.create(token))).data,
+    mutationFn: async (token: string) => (await api.post<AuthSession>(apiV1AuthMagicLinksSessions.create(token))).data,
     onSuccess: (session) => acceptSession(qc, session),
   })
 }
@@ -87,7 +87,7 @@ export function useSignOut() {
   return useMutation({
     mutationFn: async () => {
       try {
-        await api.del(apiV1AuthSession.delete())
+        await api.del(apiV1AuthSessions.destroy())
       } finally {
         clearTokens()
         await qc.cancelQueries()
@@ -121,7 +121,7 @@ export function useEmailConfirmation(token: string) {
   return useQuery({
     queryKey: qk.emailConfirmation(token),
     queryFn: async ({ signal }) =>
-      (await api.get<EmailChange>(apiV1SettingsEmailConfirmation.show(token), { signal })).data,
+      (await api.get<EmailChange>(apiV1SettingsEmailConfirmations.show(token), { signal })).data,
     enabled: Boolean(token),
     retry: false,
   })
@@ -130,7 +130,7 @@ export function useApplyEmailConfirmation() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (token: string) =>
-      (await api.post<User>(apiV1SettingsEmailConfirmation.create(), { token })).data,
+      (await api.post<User>(apiV1SettingsEmailConfirmations.create(), { token })).data,
     onSuccess: async (_, token) => {
       qc.removeQueries({ queryKey: qk.emailConfirmation(token) })
       await Promise.all([
@@ -152,7 +152,7 @@ export function useStopImpersonation() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async () => {
-      await api.del(apiV1AuthImpersonation.delete())
+      await api.del(apiV1AuthImpersonation.destroy())
       const admin = localStorage.getItem(ADMIN_TOKEN_KEY)
       clearTokens()
       if (admin) setToken(admin)

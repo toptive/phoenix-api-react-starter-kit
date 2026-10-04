@@ -1,5 +1,5 @@
 import type { DirectUpload } from "./generated/serializers"
-import { apiV1DirectUpload } from "./generated/routes"
+import { apiV1DirectUploads } from "./generated/routes"
 import { i18n } from "@/i18n"
 import { toast } from "sonner"
 import { api, ApiError } from "./http"
@@ -18,7 +18,7 @@ export async function uploadFile(file: File, kind: UploadKind): Promise<string> 
   let upload: DirectUpload
   try {
     upload = (
-      await api.post<DirectUpload>(apiV1DirectUpload.create(), {
+      await api.post<DirectUpload>(apiV1DirectUploads.create(), {
         filename: file.name,
         contentType: file.type,
         byteSize: file.size,

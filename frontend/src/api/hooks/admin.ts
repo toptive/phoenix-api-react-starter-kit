@@ -3,15 +3,15 @@ import { api, getToken, ADMIN_TOKEN_KEY } from "../http"
 import {
   apiV1AdminJobsAccess,
   apiV1AdminDashboard,
-  apiV1AdminUser,
-  apiV1AdminImpersonation,
-  apiV1AdminOrganization,
-  apiV1AdminTranslation,
-  apiV1AdminTranslationFill,
-  apiV1AdminLegalDocument,
-  apiV1AdminLegalDocumentVersion,
-  apiV1AdminLegalPublication,
-  apiV1AdminAuditEvent,
+  apiV1AdminUsers,
+  apiV1AdminUsersImpersonation,
+  apiV1AdminOrganizations,
+  apiV1AdminTranslations,
+  apiV1AdminTranslationFills,
+  apiV1AdminLegalDocuments,
+  apiV1AdminLegalDocumentsVersions,
+  apiV1AdminLegalDocumentsVersionsPublication,
+  apiV1AdminAuditEvents,
 } from "../generated/routes"
 import type {
   JobsAccess,
@@ -43,18 +43,18 @@ export const useAdminStats = () =>
 export const useAdminUsers = (search: ListSearch) =>
   useQuery({
     queryKey: qk.adminUsers(search),
-    queryFn: ({ signal }) => api.get<User[]>(apiV1AdminUser.index({ query: search }), { signal }),
+    queryFn: ({ signal }) => api.get<User[]>(apiV1AdminUsers.index({ query: search }), { signal }),
     placeholderData: keepPreviousData,
   })
 export const useAdminUser = (id: string) =>
   useQuery({
     queryKey: qk.adminUser(id),
-    queryFn: async ({ signal }) => (await api.get<AdminUserDetail>(apiV1AdminUser.show(id), { signal })).data,
+    queryFn: async ({ signal }) => (await api.get<AdminUserDetail>(apiV1AdminUsers.show(id), { signal })).data,
   })
 export function useUpdateAdminUser(id: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (role: User["role"]) => (await api.put<User>(apiV1AdminUser.update(id), { role })).data,
+    mutationFn: async (role: User["role"]) => (await api.put<User>(apiV1AdminUsers.update(id), { role })).data,
     onSuccess: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["admin", "users"] }),
@@ -69,7 +69,7 @@ export function useImpersonate(id: string) {
   return useMutation({
     mutationFn: async (input: ImpersonationInput) => {
       const admin = getToken()
-      const session = (await api.post<AuthSession>(apiV1AdminImpersonation.create(id), input)).data
+      const session = (await api.post<AuthSession>(apiV1AdminUsersImpersonation.create(id), input)).data
       if (!admin || !session.token || !session.impersonator) throw new Error("Invalid impersonation session")
       localStorage.setItem(ADMIN_TOKEN_KEY, admin)
       return session
@@ -80,19 +80,19 @@ export function useImpersonate(id: string) {
 export const useAdminOrganizations = (search: ListSearch) =>
   useQuery({
     queryKey: qk.adminOrganizations(search),
-    queryFn: ({ signal }) => api.get<AdminOrganization[]>(apiV1AdminOrganization.index({ query: search }), { signal }),
+    queryFn: ({ signal }) => api.get<AdminOrganization[]>(apiV1AdminOrganizations.index({ query: search }), { signal }),
     placeholderData: keepPreviousData,
   })
 export const useAdminOrganization = (id: string) =>
   useQuery({
     queryKey: qk.adminOrganization(id),
     queryFn: async ({ signal }) =>
-      (await api.get<AdminOrganizationDetail>(apiV1AdminOrganization.show(id), { signal })).data,
+      (await api.get<AdminOrganizationDetail>(apiV1AdminOrganizations.show(id), { signal })).data,
   })
 export const useAdminTranslations = (search: TranslationSearch) =>
   useQuery({
     queryKey: qk.adminTranslations(search),
-    queryFn: ({ signal }) => api.get<TranslationEntry[]>(apiV1AdminTranslation.index({ query: search }), { signal }),
+    queryFn: ({ signal }) => api.get<TranslationEntry[]>(apiV1AdminTranslations.index({ query: search }), { signal }),
     placeholderData: keepPreviousData,
   })
 async function refreshTranslations(qc: QueryClient) {
@@ -110,7 +110,7 @@ export function useUpdateTranslation() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ key, ...input }: TranslationInput & { key: string }) =>
-      (await api.put<TranslationEntry>(apiV1AdminTranslation.update(key), input)).data,
+      (await api.put<TranslationEntry>(apiV1AdminTranslations.update(key), input)).data,
     onSuccess: () => refreshTranslations(qc),
   })
 }
@@ -118,19 +118,19 @@ export function useFillTranslations() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (locale: string) =>
-      (await api.post<TranslationFill>(apiV1AdminTranslationFill.create(), { locale })).data,
+      (await api.post<TranslationFill>(apiV1AdminTranslationFills.create(), { locale })).data,
     onSuccess: () => refreshTranslations(qc),
   })
 }
 export const useLegalDocuments = () =>
   useQuery({
     queryKey: qk.adminLegalRoot,
-    queryFn: async ({ signal }) => (await api.get<LegalDocument[]>(apiV1AdminLegalDocument.index(), { signal })).data,
+    queryFn: async ({ signal }) => (await api.get<LegalDocument[]>(apiV1AdminLegalDocuments.index(), { signal })).data,
   })
 export const useLegalDocument = (slug: string) =>
   useQuery({
     queryKey: qk.adminLegal(slug),
-    queryFn: async ({ signal }) => (await api.get<LegalDocument>(apiV1AdminLegalDocument.show(slug), { signal })).data,
+    queryFn: async ({ signal }) => (await api.get<LegalDocument>(apiV1AdminLegalDocuments.show(slug), { signal })).data,
   })
 async function refreshLegal(qc: QueryClient) {
   await Promise.all([
@@ -143,7 +143,7 @@ export function useCreateLegalVersion(slug: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (input: LegalVersionInput) =>
-      (await api.post<LegalDocumentVersion>(apiV1AdminLegalDocumentVersion.create(slug), input)).data,
+      (await api.post<LegalDocumentVersion>(apiV1AdminLegalDocumentsVersions.create(slug), input)).data,
     onSuccess: () => refreshLegal(qc),
   })
 }
@@ -151,14 +151,14 @@ export function usePublishLegalVersion(slug: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (number: number) =>
-      (await api.post<LegalDocument>(apiV1AdminLegalPublication.create({ slug, number }))).data,
+      (await api.post<LegalDocument>(apiV1AdminLegalDocumentsVersionsPublication.create(slug, number))).data,
     onSuccess: () => refreshLegal(qc),
   })
 }
 export const useAuditEvents = (search: ListSearch) =>
   useQuery({
     queryKey: qk.adminAudit(search),
-    queryFn: ({ signal }) => api.get<AuditEvent[]>(apiV1AdminAuditEvent.index({ query: search }), { signal }),
+    queryFn: ({ signal }) => api.get<AuditEvent[]>(apiV1AdminAuditEvents.index({ query: search }), { signal }),
     placeholderData: keepPreviousData,
   })
 

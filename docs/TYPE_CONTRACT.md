@@ -11,11 +11,12 @@ Never edit generated files or hand-write mirror response interfaces.
 2. Run `mix typelizer.gen` with the dev database running and migrated (column nullability).
 3. Update React callers and run `pnpm typecheck`, `pnpm lint`, `pnpm test` and `bin/check`.
 
-The page generator is disabled. API helper names follow Phoenix's singular helper names:
-`apiV1AuthSession.create().url`, `apiV1SettingsMembership.delete(id).url`.
-The runtime exports `setRoutesBaseUrl`, `setUrlDefaults` and `addUrlDefault`.
-API locale path parameters are required; UI locale is sent in Accept-Language.
-Browser navigation uses the SPA's paths and TanStack Router, not API helpers.
+The page generator is disabled. `routes: [naming: :controller_path]` uses the shared contract:
+plural URL resource names (`apiV1AuthMagicLinks`, `apiV1SettingsSessions`), nested resources
+concatenated (`apiV1AdminLegalDocumentsVersionsPublication`), and `destroy` for DELETE.
+Helpers accept positional path parameters in URL order, then optional `{ query }` options.
+Files live under `routes/Api/V1/<Namespace>/<Controller>Controller.ts`, have default exports,
+and are re-exported by `index.ts`. The runtime exports `setBaseUrl` and `RouteDefinition`.
 
 ## Serializers
 
@@ -43,6 +44,7 @@ The generator excludes the SPA fallback, `/dev`, `/live` and `/admin/jobs` brows
 | `sitemap.show` | crawlers and public-host reverse proxies |
 | `robots.show` | crawlers and public-host reverse proxies |
 | `apiV1AuthGoogleCallback.create` | Google OAuth redirect, never called by SPA code |
-| `webhooksStripeEvent.create` | Stripe webhook delivery |
+| `webhooksStripeEvents.create` | Stripe webhook delivery |
 
-Typelizer is a Hex dependency (`~> 0.2`). Propose generator changes upstream, never patch it locally.
+Typelizer temporarily uses `path: "../typelizer-ex"` for controller-path naming.
+Swap back to the Hex dependency when this option is released; generator changes belong in the library.

@@ -3,7 +3,7 @@ import { i18n } from "@/i18n"
 import { reportApiFailure } from "@/lib/api-failure"
 import { storageKey } from "@/lib/storage-keys"
 import type { ApiErrorBody, Envelope as GeneratedEnvelope, Pagination } from "./generated/serializers"
-import { setRoutesBaseUrl, type Method, type RouteDefinition } from "./generated/routes/runtime"
+import { setBaseUrl, type Method, type RouteDefinition } from "./generated/routes/runtime"
 
 type Envelope<T> = GeneratedEnvelope<T, { pagination?: Pagination } & Record<string, unknown>>
 
@@ -21,7 +21,7 @@ export const clearTokens = () => {
 let origin = ""
 export function configureApi(value: string) {
   origin = value.replace(/\/+$/, "").replace(/\/api\/v1$/, "")
-  setRoutesBaseUrl(origin)
+  setBaseUrl(origin)
 }
 configureApi(import.meta.env.VITE_API_URL ?? "")
 
@@ -101,12 +101,18 @@ export async function request<T>(
       ["unauthorized", "session_expired"].includes(error.code)
     )
       sessionExpired()
-    if (response.status === 429) toast.error(error.message)
+    if (response.status === 429) {
+      const seconds = Number(response.headers.get("Retry-After"))
+      toast.error(error.message, {
+        ...(seconds > 0 ? { description: i18n.t("errors.retry_after", { count: seconds }) } : {}),
+      })
+    }
     if (
       ![
         "sudo_required",
         "email_unavailable",
         "ai_not_configured",
+        "ai_unavailable",
         "uploads_not_configured",
         "stripe_unavailable",
         "test_mode",

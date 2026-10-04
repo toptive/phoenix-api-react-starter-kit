@@ -74,11 +74,7 @@ export default function MembersIndex() {
       {Boolean(members.data?.length) && (
         <ul className="divide-y rounded-xl border bg-card">
           {members.data!.map((membership) => (
-            <MemberRow
-              key={`${membership.id}:${membership.role}:${membership.access}`}
-              membership={membership}
-              canManage={canManage}
-            />
+            <MemberRow key={membership.id} membership={membership} canManage={canManage} />
           ))}
         </ul>
       )}

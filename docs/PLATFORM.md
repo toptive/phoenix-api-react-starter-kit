@@ -153,7 +153,7 @@ Anthropic SDKs directly. Keys and models from the environment (`OPENROUTER_API_K
 ## Uploads
 
 `POST /api/v1/direct-uploads` requires a bearer and accepts flat `filename`, `contentType`,
-integer `byteSize`, and `kind`. It returns 201 `DirectUpload { key, url, headers, expiresAt }`.
+integer `byteSize`, and `kind`. It returns 201 `DirectUpload { url, key, method, headers }`.
 The presigned PUT expires after ten minutes, fixes `content-type`, and stores a private key
 under `uploads/<current organization id>/<uuid>/<safe filename>`. An incoming organization
 id is ignored. The endpoint is rate limited to 60 requests/minute per client IP.

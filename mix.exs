@@ -80,9 +80,8 @@ defmodule StarterKit.MixProject do
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       {:ex_check, "~> 0.17", only: [:dev, :test], runtime: false},
       # Type contract (serializers → TypeScript). docs/TYPE_CONTRACT.md
-      {:typelizer, "~> 0.2"}
-      # Working on the library itself? Swap the line above for:
-      # {:typelizer, path: "../typelizer-ex"}
+      {:typelizer, path: "../typelizer-ex"}
+      # Swap back to {:typelizer, "~> 0.2"} once controller-path naming is released on Hex.
     ]
   end
 

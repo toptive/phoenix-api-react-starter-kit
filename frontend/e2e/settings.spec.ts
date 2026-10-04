@@ -35,7 +35,7 @@ test("turn optional emails off and back on, preserving each choice after reload"
     await expect(page.getByRole("button", { name: text("common.save_changes"), exact: true })).toBeDisabled()
     await page.reload()
     await expect(page.getByRole("switch")).toHaveAttribute("aria-checked", String(enabled))
-    expect(await api.call(routes.apiV1SettingsEmailPreference.show(), undefined, user.token)).toEqual({
+    expect(await api.call(routes.apiV1SettingsEmailPreferences.show(), undefined, user.token)).toEqual({
       optionalEmails: enabled,
     })
   }
@@ -43,7 +43,7 @@ test("turn optional emails off and back on, preserving each choice after reload"
 
 test("sign out another device while this device stays signed in", async ({ page, browser, createUser, api }) => {
   const user = await createUser({ withPassword: true })
-  const other = await api.call<AuthSession>(routes.apiV1AuthSession.create(), { email: user.user.email, password })
+  const other = await api.call<AuthSession>(routes.apiV1AuthSessions.create(), { email: user.user.email, password })
   const context = await browser.newContext({ baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173" })
   const secondPage = await context.newPage()
   try {
@@ -101,7 +101,7 @@ test("changing the password replaces this bearer and revokes the other browser s
   createUser,
 }) => {
   const user = await createUser({ withPassword: true })
-  const other = await api.call<AuthSession>(routes.apiV1AuthSession.create(), { email: user.user.email, password })
+  const other = await api.call<AuthSession>(routes.apiV1AuthSessions.create(), { email: user.user.email, password })
   const context = await browser.newContext({ baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173" })
   const otherPage = await context.newPage()
   const replacement = "Replacement-password-2026"
@@ -123,7 +123,7 @@ test("changing the password replaces this bearer and revokes the other browser s
     await expect(page.getByRole("heading", { name: text("settings.password.title_change"), exact: true })).toBeVisible()
     expect(
       (
-        await api.call<AuthSession>(routes.apiV1AuthSession.create(), {
+        await api.call<AuthSession>(routes.apiV1AuthSessions.create(), {
           email: user.user.email,
           password: replacement,
         })

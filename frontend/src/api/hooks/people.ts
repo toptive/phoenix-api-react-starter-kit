@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "../http"
-import { apiV1SettingsOrganization, apiV1SettingsMembership, apiV1SettingsInvitation } from "../generated/routes"
+import { apiV1SettingsOrganization, apiV1SettingsMembers, apiV1SettingsInvitations } from "../generated/routes"
 import type { Organization, OrganizationSettings, Membership, Invitation } from "../generated/serializers"
 import { qk } from "../query-keys"
 import { useAppConfig } from "./bootstrap"
@@ -45,7 +45,7 @@ export function useMembers() {
   const keys = useOrganizationKeys()
   return useQuery({
     queryKey: keys.members,
-    queryFn: async ({ signal }) => (await api.get<Membership[]>(apiV1SettingsMembership.index(), { signal })).data,
+    queryFn: async ({ signal }) => (await api.get<Membership[]>(apiV1SettingsMembers.index(), { signal })).data,
     retry: false,
   })
 }
@@ -54,7 +54,7 @@ export function useUpdateMembership() {
   const keys = useOrganizationKeys()
   return useMutation({
     mutationFn: async ({ id, ...input }: MembershipInput & { id: string }) =>
-      (await api.put<Membership>(apiV1SettingsMembership.update(id), input)).data,
+      (await api.put<Membership>(apiV1SettingsMembers.update(id), input)).data,
     onSuccess: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: keys.members }),
@@ -69,7 +69,7 @@ export function useRemoveMembership() {
   const keys = useOrganizationKeys()
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.del(apiV1SettingsMembership.delete(id))
+      await api.del(apiV1SettingsMembers.destroy(id))
       return id
     },
     onSuccess: async (id) => {
@@ -86,7 +86,7 @@ export function usePendingInvitations() {
   const keys = useOrganizationKeys()
   return useQuery({
     queryKey: keys.invitations,
-    queryFn: async ({ signal }) => (await api.get<Invitation[]>(apiV1SettingsInvitation.index(), { signal })).data,
+    queryFn: async ({ signal }) => (await api.get<Invitation[]>(apiV1SettingsInvitations.index(), { signal })).data,
     enabled: isManager(keys.auth.membership),
     retry: false,
   })
@@ -96,7 +96,7 @@ export function useInvitePerson() {
   const keys = useOrganizationKeys()
   return useMutation({
     mutationFn: async (input: InvitationInput) =>
-      (await api.post<Invitation>(apiV1SettingsInvitation.create(), input)).data,
+      (await api.post<Invitation>(apiV1SettingsInvitations.create(), input)).data,
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: keys.invitations })
     },
@@ -107,7 +107,7 @@ export function useRevokeInvitation() {
   const keys = useOrganizationKeys()
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.del(apiV1SettingsInvitation.delete(id))
+      await api.del(apiV1SettingsInvitations.destroy(id))
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: keys.invitations })
