@@ -40,3 +40,7 @@ starter_kit-*.tar
 # Dialyzer PLTs
 /priv/plts/
 
+/frontend/dist/
+/priv/static/index.html
+/priv/static/en/
+/priv/static/es/

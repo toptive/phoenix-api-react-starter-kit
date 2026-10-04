@@ -100,15 +100,17 @@ and `useSharedProps()` for shared props. Details: [docs/TYPE_CONTRACT.md](docs/T
 
 ## Frontend
 
-- React 19, TypeScript strict, Vite, Tailwind v4. Data comes ONLY as Inertia props and visits:
-  no `fetch`/`axios` for data (the one exception is `lib/uploads.ts`), no `useEffect` for data.
-- Forms use Inertia's `useForm` — never react-hook-form. Wrap params with `form.transform`.
-- **We own the components.** All shadcn primitives live in `components/ui`; change a look
-  app-wide by editing the component. Repeated patterns become `components/app/*`
-  (never copy-paste between pages).
-- **Theme tokens only**: `bg-primary`, `text-muted-foreground`… Never `text-blue-500` or `#hex`
-  (ESLint fails). New colours are new tokens in `assets/css/theme.css`.
-- All files and folders kebab-case. Pages mirror controllers: `pages/<resource>/<action>.tsx`.
+- React 19, TypeScript strict, Vite, Tailwind v4; one SPA in `frontend/`, one root `package.json`.
+- TanStack Router guards wait for bootstrap; React Query loads data only through `@/api/hooks`.
+  No `useEffect` for data, no `fetch`/`axios` outside `src/api/http.ts`.
+- Forms use react-hook-form + Zod schemas in `src/schemas`; map server field errors using their
+  i18n keys. Keep `FormStepper`, `FieldHelp` and `ConfirmDialog`.
+- Serializer types and API route helpers live in `frontend/src/api/generated/`; the backend
+  generator owns them once it emits the contract. Never add hand-written mirror response types.
+- **We own the components.** Edit `components/ui` for app-wide changes; repeated patterns live
+  in `components/app`. Theme tokens only; new colours go in `frontend/src/css/theme.css`.
+- Files and folders are kebab-case (generated files follow the generator). Pages mirror resources:
+  `pages/<resource>/<action>.tsx`. Every UI string comes from `i18n/translations.csv`.
 
 ## UX rules
 

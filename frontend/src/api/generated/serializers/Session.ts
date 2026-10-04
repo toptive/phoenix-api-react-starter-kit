@@ -1,0 +1,8 @@
+export interface Session {
+  id: string
+  userAgent: string | null
+  ipAddress: string | null
+  authenticatedAt: string | null
+  insertedAt: string
+  current: boolean
+}

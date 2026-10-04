@@ -1,6 +1,6 @@
 # Design system
 
-**A product changes tokens, not components.** Re-skin by editing `assets/css/theme.css` only.
+**A product changes tokens, not components.** Re-skin by editing `frontend/src/css/theme.css` only.
 
 ## Default theme: "Paperwork, handled"
 
@@ -33,7 +33,7 @@ one exception (inline styles, `config :starter_kit, :mail_brand`).
 |---|---|---|
 | Primitives | `components/ui/` | every shadcn component, owned — edit them to change a look app-wide |
 | App components | `components/app/` | repeated patterns; a pattern used twice moves here |
-| Layouts | `layouts/` | chosen by page path in `inertia.tsx`; pages never wrap themselves |
+| Layouts | `layouts/` | chosen by route metadata in `app-shell.tsx`; pages never wrap themselves |
 | Pages | `pages/<resource>/<action>.tsx` | one per controller action |
 
 App components: `FormStepper` (multi-step forms with review), `FormField` + `FieldHelp`
@@ -65,7 +65,7 @@ actions confirm and say the consequence; every empty state offers the first step
 ## Appearance
 
 Light / dark / system per browser (`useAppearance`, `localStorage`), applied before first paint
-by an inline script in `root.html.heex`.
+by an inline script in `frontend/index.html`.
 
 ## Re-skin checklist for a product
 
@@ -75,3 +75,14 @@ by an inline script in `root.html.heex`.
    apple-touch-icon, manifest icons) and `bin/og-cards.mjs` (social cards per locale, [SEO.md](SEO.md)).
 4. `config :starter_kit, :theme_color` and `:mail_brand`.
 5. Landing copy lives in `i18n/translations.csv` (`home.*`).
+
+## Frontend
+
+The shared SPA lives in `frontend/src`. TanStack Router waits for bootstrap before applying
+route guards; React Query hooks in `api/hooks` own data loading. Forms use react-hook-form
+and Zod schemas, preserving guided steps, in-place help and confirmation dialogs. API types
+and route helpers in `api/generated` belong to the backend generator once available.
+
+`pnpm build` prerenders the landing in English and Spanish from the same React components
+and build-time locale fallback. Runtime catalogue updates come from the locale API. Set
+`VITE_PUBLIC_URL` for canonical links and `VITE_API_URL` for a native or separate-origin API.
