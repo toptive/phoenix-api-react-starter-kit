@@ -8,6 +8,7 @@ import {
   type ErrorComponentProps,
 } from "@tanstack/react-router"
 import type { QueryClient } from "@tanstack/react-query"
+import { bundledLocales } from "@/i18n"
 import { AppShell } from "@/app-shell"
 import { bootstrapOptions } from "@/api/hooks/bootstrap"
 import { localeOptions, restoreLocale } from "@/api/hooks/locales"
@@ -52,7 +53,7 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
   notFoundComponent: () => <ErrorShow status={404} />,
   beforeLoad: async ({ context, location, matches }) => {
     clearApiFailure()
-    const knownLocales = context.queryClient.getQueryData<Bootstrap>(qk.bootstrap)?.locales ?? ["en", "es"]
+    const knownLocales = context.queryClient.getQueryData<Bootstrap>(qk.bootstrap)?.locales ?? bundledLocales
     const localeParam = matches.at(-1)?.params as { locale?: string } | undefined
     if (
       matches.some((match) => match._notFound) ||
@@ -89,12 +90,34 @@ const authSearch = (search: Record<string, unknown>): Record<string, string> =>
       )
       .map(([key, value]) => [key, String(value)]),
   )
+const localeSearch = (search: Record<string, unknown>) => ({
+  ...(typeof search.locale === "string" ? { locale: search.locale } : {}),
+})
+const listSearch = (search: Record<string, unknown>) => ({
+  ...localeSearch(search),
+  q: typeof search.q === "string" ? search.q.trim() : "",
+  page: Math.min(1_000_000, Math.max(1, Math.floor(Number(search.page) || 1))),
+  perPage: Math.min(100, Math.max(1, Math.floor(Number(search.perPage) || 25))),
+  missing: search.missing === true || search.missing === "true" || search.missing === "1",
+})
+const billingSearch = (search: Record<string, unknown>) => ({
+  ...localeSearch(search),
+  ...(search.checkout === "done" ? { checkout: "done" } : {}),
+})
 const route = (path: string, guard: Guard, shell: Shell, component = reservedComponent) =>
   createRoute({
     getParentRoute: () => rootRoute,
     path,
     staticData: { shell },
-    validateSearch: authSearch,
+    validateSearch: ["/admin/users", "/admin/organizations", "/admin/translations", "/admin/audit-events"].includes(
+      path,
+    )
+      ? listSearch
+      : path === "/settings/billing"
+        ? billingSearch
+        : shell === "auth"
+          ? authSearch
+          : localeSearch,
     component,
     beforeLoad: ({ context, location }) => {
       guardRoute(guard, context.bootstrap, location.href)
@@ -148,18 +171,6 @@ const routes = [
     "public",
     "auth",
     lazyRouteComponent(() => import("@/pages/magic-links/show")),
-  ),
-  route(
-    "/password-resets/new",
-    "guest",
-    "auth",
-    lazyRouteComponent(() => import("@/pages/password-resets/new")),
-  ),
-  route(
-    "/password-resets/edit",
-    "sudo",
-    "app",
-    lazyRouteComponent(() => import("@/pages/password-resets/edit")),
   ),
   route(
     "/sudo/new",
@@ -224,7 +235,7 @@ export const router = createRouter({
 router.subscribe("onResolved", ({ toLocation }) => {
   if (
     toLocation.pathname === "/" ||
-    /^\/(en|es)$/.test(toLocation.pathname) ||
+    bundledLocales.some((locale) => toLocation.pathname === `/${locale}`) ||
     toLocation.pathname.includes("/legal/")
   ) {
     void recordPageView(

@@ -1,8 +1,10 @@
 import { useCallback, useSyncExternalStore } from "react"
 
+import { storageKey } from "@/lib/storage-keys"
+
 export type Appearance = "light" | "dark" | "system"
 
-const STORAGE_KEY = "starterkit:appearance"
+const STORAGE_KEY = storageKey("appearance")
 const listeners = new Set<() => void>()
 
 function prefersDark(): boolean {

@@ -75,7 +75,7 @@ describe("router guards", () => {
     ).toMatchObject({ isNotFound: true })
   })
   it("accepts recovery and invitation destinations, rejecting external and looping targets", () => {
-    expect(safeReturnPath("/password-resets/edit")).toBe("/password-resets/edit")
+    expect(safeReturnPath("/settings/password/edit")).toBe("/settings/password/edit")
     expect(safeReturnPath("/invitations/token")).toBe("/invitations/token")
     for (const path of [
       "https://evil.test",

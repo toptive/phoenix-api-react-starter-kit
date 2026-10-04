@@ -9,7 +9,7 @@ import {
   RouterProvider,
   Outlet,
 } from "@tanstack/react-router"
-import { createI18n } from "@/i18n"
+import { createI18n, bundledLocales } from "@/i18n"
 import type { Bootstrap } from "@/api/generated/serializers"
 import { qk } from "@/api/query-keys"
 import { PublicLayout } from "@/layouts/public-layout"
@@ -22,7 +22,7 @@ export async function render(locale = "en") {
   const bootstrap: Bootstrap = {
     auth: null,
     locale,
-    locales: ["en", "es"],
+    locales: bundledLocales,
     i18nVersion: "build",
     app: {
       name: localeInstance.t("app.name"),

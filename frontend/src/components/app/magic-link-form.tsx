@@ -12,10 +12,9 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { magicLinkSchema } from "@/schemas/auth"
 import { applyFormErrors, fieldMessage } from "@/lib/form-errors"
-import { returnPath } from "@/lib/auth-flow"
 import { paths } from "@/lib/paths"
-/** Sign-in, recovery and sudo all request the same scanner-safe magic link. */
-export function MagicLinkForm({ email = "", recovery = false }: { email?: string; recovery?: boolean }) {
+/** Sign-in and sudo request the same scanner-safe magic link. */
+export function MagicLinkForm({ email = "" }: { email?: string }) {
   const { t } = useTranslation()
   const { turnstile } = useAppConfig()
   const navigate = useNavigate()
@@ -31,7 +30,6 @@ export function MagicLinkForm({ email = "", recovery = false }: { email?: string
       className="grid gap-5"
       onSubmit={form.handleSubmit(async (input) => {
         try {
-          if (recovery) returnPath.set(paths.resetPassword)
           const result = await request.mutateAsync(input)
           void navigate({ to: paths.checkEmail, search: { email: result.email } })
         } catch (error) {

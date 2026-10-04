@@ -108,6 +108,19 @@ describe("HTTP transport", () => {
     expect(redirect).not.toHaveBeenCalled()
     expect(fetchStub.mock.calls[0]?.[1]?.headers).not.toHaveProperty("Authorization")
   })
+  it("keeps the authenticated session when sudo rejects a password", async () => {
+    const redirect = vi.fn()
+    setUnauthorizedHandler(redirect)
+    setToken("existing")
+    fetchStub.mockResolvedValue(
+      Response.json({ error: { code: "invalid_credentials", message: "Try again", details: {} } }, { status: 401 }),
+    )
+    await expect(api.post(apiV1AuthSessions.create(), { password: "wrong" })).rejects.toMatchObject({
+      code: "invalid_credentials",
+    })
+    expect(getToken()).toBe("existing")
+    expect(redirect).not.toHaveBeenCalled()
+  })
   it("toasts rate-limit messages and still rejects for the caller", async () => {
     fetchStub.mockResolvedValue(
       Response.json(

@@ -6,8 +6,6 @@ export const paths = {
   signIn: "/session/new",
   register: "/registration/new",
   checkEmail: "/session/check-your-email",
-  forgotPassword: "/password-resets/new",
-  resetPassword: "/password-resets/edit",
   dashboard: "/dashboard",
   onboarding: "/onboarding/edit",
   newOrganization: "/organizations/new",

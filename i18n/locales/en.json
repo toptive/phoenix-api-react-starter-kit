@@ -545,5 +545,8 @@
   "validation.terms_required": "Accept the terms and the privacy policy to create your account.",
   "validation.turnstile_required": "We couldn't confirm that you're a person. Wait for the security check to finish, then send the form again.",
   "validation.unique": "This is already taken.",
-  "validation.unsafe_unique": "This is already taken."
+  "validation.unsafe_unique": "This is already taken.",
+  "errors.api.sudo_required": "Confirm it’s you before continuing.",
+  "errors.api.email_unavailable": "Email delivery is unavailable. Try again later.",
+  "auth.session.forgot_help": "Forgot your password? Sign in with an email link, then set a new password in Settings."
 }

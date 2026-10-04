@@ -1,11 +1,11 @@
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, rmSync, cpSync } from "node:fs"
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, cpSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import { build } from "vite"
 
 const frontend = resolve(import.meta.dirname, "..")
-const output = resolve(frontend, "../priv/static")
+const output = resolve(frontend, process.env.VITE_OUT_DIR ?? "../priv/static")
 const temporary = mkdtempSync(join(tmpdir(), "starterkit-landing-"))
 try {
   await build({
@@ -26,7 +26,9 @@ try {
   if (!template.includes(marker)) throw new Error("The landing placeholder is missing from the Vite output")
   const portable = join(frontend, "dist")
   rmSync(portable, { recursive: true, force: true })
-  for (const locale of ["en", "es"]) {
+  for (const locale of readdirSync(resolve(frontend, "../i18n/locales"))
+    .filter((file) => file.endsWith(".json"))
+    .map((file) => file.slice(0, -5))) {
     let html = await render(locale)
     // React 19 hoists metadata to the start of the server output; put it in the document head.
     const head = []
@@ -51,7 +53,7 @@ try {
     writeFileSync(join(dist, "index.html"), page)
   }
   cpSync(join(output, "assets"), join(portable, "assets"), { recursive: true })
-  console.log("Prerendered English and Spanish landing pages")
+  console.log("Prerendered landing pages for all bundled locales")
 } finally {
   rmSync(temporary, { recursive: true, force: true })
 }

@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { registrationSchema } from "@/schemas/auth"
+import { limits } from "@/schemas/limits"
 import { applyFormErrors, fieldMessage } from "@/lib/form-errors"
 import { ApiError } from "@/api/http"
 import { paths } from "@/lib/paths"
@@ -86,7 +87,10 @@ export default function RegisterPage() {
             title: t("fields.name"),
             isValid: () => registrationSchema.shape.name.safeParse(form.getValues("name")).success,
             content: (
-              <FormField label={t("fields.name")} error={fieldMessage(form.formState.errors.name?.message, 120)}>
+              <FormField
+                label={t("fields.name")}
+                error={fieldMessage(form.formState.errors.name?.message, { count: limits.nameMax })}
+              >
                 {(id, describedBy) => (
                   <Input id={id} aria-describedby={describedBy} autoComplete="name" {...form.register("name")} />
                 )}

@@ -7,7 +7,6 @@ import {
   apiV1AuthRegistrations,
   apiV1AuthSudo,
   apiV1AuthGoogleStart,
-  apiV1SettingsPassword,
   apiV1SettingsEmailConfirmations,
   apiV1CurrentOrganization,
   apiV1AuthImpersonation,
@@ -23,10 +22,10 @@ import type {
 } from "../generated/serializers"
 import { qk } from "../query-keys"
 import { bootstrapOptions, useBootstrap } from "./bootstrap"
-import type { SignInInput, MagicLinkInput, RegistrationInput, PasswordInput } from "@/schemas/auth"
+import type { SignInInput, MagicLinkInput, RegistrationInput } from "@/schemas/auth"
 import { safeReturnPath } from "@/lib/auth-flow"
 
-async function acceptSession(qc: QueryClient, session: AuthSession) {
+export async function acceptSession(qc: QueryClient, session: AuthSession) {
   await qc.cancelQueries()
   if (session.token) {
     if (!session.impersonator) clearTokens()
@@ -72,16 +71,6 @@ export function useConsumeMagicLink() {
 }
 /** A first magic-link session confirms the address as well as signing in. */
 export const useConfirmEmail = useConsumeMagicLink
-/** Password recovery uses the existing magic-link contract, then a sudo-protected change. */
-export const useRequestPasswordReset = useRequestMagicLink
-export function useApplyPasswordReset() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (input: PasswordInput) =>
-      (await api.put<AuthSession>(apiV1SettingsPassword.update(), input)).data,
-    onSuccess: (session) => acceptSession(qc, session),
-  })
-}
 export function useSudo() {
   const qc = useQueryClient()
   return useMutation({

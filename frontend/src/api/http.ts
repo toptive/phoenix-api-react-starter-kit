@@ -70,7 +70,6 @@ export async function request<T>(
     signal: options.signal,
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
-  if (response.status === 401 && token && getToken() === token) sessionExpired()
   if (response.status === 204 || response.status === 304) return { data: undefined as T }
   let payload: { error?: ApiErrorBody } & Partial<Envelope<T>> = {}
   try {
@@ -83,6 +82,13 @@ export async function request<T>(
       payload.error ?? { code: "internal_error", message: i18n.t("errors.api.internal_error"), details: {} },
       response.status,
     )
+    if (
+      response.status === 401 &&
+      token &&
+      getToken() === token &&
+      ["unauthorized", "session_expired"].includes(error.code)
+    )
+      sessionExpired()
     if (response.status === 429) toast.error(error.message)
     reportApiFailure(response.status)
     throw error

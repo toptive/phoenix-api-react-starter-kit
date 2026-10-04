@@ -52,18 +52,6 @@ export default function ConfirmEmailPage() {
         <Button type="submit" size="lg" className="w-full" disabled={consume.isPending || sudo.isPending}>
           {t(preview.data.confirmed ? "auth.magic_link.submit" : "auth.magic_link.confirm_submit")}
         </Button>
-        {preview.data.confirmed && (
-          <Button
-            type="button"
-            size="lg"
-            variant="outline"
-            className="mt-3 w-full"
-            disabled={consume.isPending || sudo.isPending}
-            onClick={() => complete(paths.resetPassword)}
-          >
-            {t("auth.password_reset.set_password")}
-          </Button>
-        )}
         <FormError error={consume.error ?? sudo.error} />
       </form>
     </>

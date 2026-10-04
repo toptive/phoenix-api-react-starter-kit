@@ -68,7 +68,7 @@ const architecture = {
 export default tseslint.config(
   {
     basePath: import.meta.dirname,
-    ignores: ["src/api/generated/**", "dist/**", "node_modules/**", "deps/**", "_build/**"],
+    ignores: ["src/api/generated/**", "dist/**", "node_modules/**"],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -122,9 +122,9 @@ export default tseslint.config(
     },
   },
   {
-    // The HTTP core is the only place allowed to call fetch.
+    // The HTTP core and direct object-storage uploads are allowed to call fetch.
     basePath: import.meta.dirname,
-    files: ["src/api/http.ts"],
+    files: ["src/api/http.ts", "src/api/uploads.ts"],
     rules: {
       "no-restricted-syntax": [
         "error",

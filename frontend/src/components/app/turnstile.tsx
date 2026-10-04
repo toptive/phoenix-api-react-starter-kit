@@ -6,11 +6,11 @@ import { useAppearance } from "@/hooks/use-appearance"
 import { useAppConfig } from "@/api/hooks/bootstrap"
 import { loadWidget, type TurnstileApi } from "@/lib/turnstile-client"
 
-/** The actions of `StarterKit.AbuseProtection.actions/0`; the server checks the same one. */
+/** Form action names verified by the API. */
 export type TurnstileAction = "registration" | "magic_link"
 
 /**
- * Cloudflare Turnstile for a form behind `Plugs.VerifyTurnstile`. Renders nothing while
+ * Cloudflare Turnstile for forms protected by the API. Renders nothing while
  * protection is off (`turnstile.required`). Tokens are single-use: bump `attempt` after
  * every submit so a fresh widget gives a new token. `onToken` must be stable (useCallback).
  * The effect only mounts the third-party widget; it never loads data.

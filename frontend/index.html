@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <script>
+      // Keep this prefix in sync with storage-keys.ts; bin/rename updates it for each product.
       const appearance = localStorage.getItem("starterkit:appearance")
       const dark = appearance === "dark" || (!appearance && matchMedia("(prefers-color-scheme: dark)").matches)
       document.documentElement.classList.toggle("dark", dark)

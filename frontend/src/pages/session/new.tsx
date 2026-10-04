@@ -107,7 +107,7 @@ function SignInForms() {
             <Button size="lg" type="submit" disabled={login.isPending}>
               {t("auth.session.submit")}
             </Button>
-            <TextLink href={paths.forgotPassword}>{t("auth.password_reset.forgot")}</TextLink>
+            <p className="text-sm text-muted-foreground">{t("auth.session.forgot_help")}</p>
           </form>
         </TabsContent>
       </Tabs>

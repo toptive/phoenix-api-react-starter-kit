@@ -47,5 +47,3 @@ starter_kit-*.tar
 
 # frontend build artefacts
 frontend/node_modules/
-frontend/dist/
-frontend/tsconfig.tsbuildinfo
