@@ -2,7 +2,7 @@
 // Renders the default social cards, one per locale: priv/static/images/og-<locale>.png
 // (1200x630, < 150 KB). StarterKitWeb.SEO.default_image/1 picks the card of the page locale.
 //
-//   PLAYWRIGHT_MODULE=/path/to/node_modules/playwright bin/og-cards.mjs
+//   bin/og-cards.mjs  # uses the root @playwright/test dependency
 //
 // The card reads the product, not a copy of it: the colours and the font come from
 // frontend/src/styles/theme.css, the logo is priv/static/favicon.svg, and the words are `app.name`
@@ -16,7 +16,7 @@ import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
-const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? "playwright")
+const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? "@playwright/test")
 const file = (relative) => pathToFileURL(path.join(root, relative)).href
 const outDir = path.join(root, "priv/static/images")
 const locales = fs

@@ -23,7 +23,9 @@ test("texts: search, edit a cell, reload the catalogue, filter and fill missing 
     await page.getByLabel(text("locale.name.en"), { exact: true }).press("Enter")
     await expect(page.getByText(edited, { exact: true })).toBeVisible()
     expect((await api.call<Record<string, string>>(routes.apiV1Locales.show("en")))["auth.session.title"]).toBe(edited)
-    const anonymous = await browser.newContext({ baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173" })
+    const anonymous = await browser.newContext({
+      baseURL: process.env.E2E_BASE_URL ?? `http://localhost:${process.env.E2E_VITE_PORT ?? "5174"}`,
+    })
     try {
       const publicPage = await anonymous.newPage()
       await publicPage.goto("/session/new")

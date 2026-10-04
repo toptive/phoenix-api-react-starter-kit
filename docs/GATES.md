@@ -32,9 +32,9 @@ When a gate fails, fix the code — never weaken the gate, never add a todo list
 - every tenant schema has an isolation test;
 - web code never touches `Repo`, `Ecto.Query` or changesets;
 - React files are kebab-case; every static i18n key exists in the CSV;
-- every rendered page exists and every page is rendered;
-- every `render_public` page is reachable by the SSR page glob (tests render without SSR, so a
-  missing page fails only in production with a 500).
+- every SPA page is wired in `router.tsx`;
+- every generated route action has a caller or a documented external consumer;
+- SPA delivery and jobs dashboard routes are excluded from generated API helpers.
 
 ## Where they run
 
@@ -84,22 +84,48 @@ Postgres allows 100 connections. Keep `POOL_SIZE` small (2–5) when several lan
 ## Browser journeys against the kit API
 
 `bin/check` runs `bin/e2e` after all Mix and frontend gates; pre-push runs the same command.
-Install Chromium once with `pnpm exec playwright install chromium`. `bin/e2e` creates and
-migrates `starter_kit_e2e`, boots `MIX_ENV=test E2E=1` on port 4100 with ordinary DB connections,
-a separate `_build/e2e` build, local mailbox, Turnstile off and AI unconfigured, runs `pnpm e2e`, and stops the API on exit.
-Override `E2E_PGDATABASE` (must contain `e2e`) or `E2E_PORT` for another local lane.
+`mix setup` installs Playwright Chromium. `bin/e2e` creates and migrates `starter_kit_e2e`,
+boots `MIX_ENV=test E2E=1` with ordinary DB connections, local mailbox, Turnstile off and AI
+unconfigured, then stops its processes and **drops the E2E database on exit**, including failures.
+The independent `_build/e2e` prevents E2E compilation from invalidating the request-test build;
+it is an ignored cache, safe to delete when the runner is stopped.
 
-Playwright owns Vite on 5173; `E2E_BASE_URL` selects an existing SPA. The browser suite uses
-real API responses. When `frontend/e2e/stripe-stub.mjs` exists, the runner enables billing and
-points Stripe HTTP at `E2E_STRIPE_URL` (default `http://localhost:4200/v1/`); global setup owns
-the stub. Without it only billing journeys skip. Traces and reports live in
-`frontend/test-results/` and `frontend/playwright-report/` (ignored).
+Playwright owns Vite on 5174 and a billing-off SPA on 5175, leaving dev's 5173 available.
+With `frontend/e2e/stripe-stub.mjs` present, `bin/e2e` sets `E2E_BILLING=1` and
+`STRIPE_API_BASE=$E2E_STRIPE_URL/v1/`. Test config does not install the `Req.Test` plug in this
+lane. Only `:test` config enables the exact stub origin for redirects; production refuses
+`STRIPE_API_BASE`. The stub serves checkout and portal redirects, prices and subscriptions;
+its signed webhooks reach the real API and Oban reconciles them. Global setup owns the stub
+and a second API with billing off against the same isolated database. All browser API requests
+reach Phoenix. Without the stub only the billing-on journeys skip.
 
-`frontend/e2e/backend.ts` is the per-kit seam: `seedUser` creates confirmed fixture accounts
+| Variable | Purpose/default |
+|---|---|
+| `E2E` | `1` imports `config/e2e.exs`; runner-owned |
+| `E2E_PGDATABASE` | disposable database, must contain `e2e`; `starter_kit_e2e` |
+| `E2E_PORT` | main API port; `4100` |
+| `E2E_API_URL` | main API origin, set by `bin/e2e` from its port |
+| `E2E_API_OFF_URL` | billing-off API origin; `http://localhost:4101` |
+| `E2E_VITE_PORT` | main Vite port; `5174`; billing-off defaults to the next port |
+| `E2E_BASE_URL` | existing main SPA origin; omit to let Playwright start Vite |
+| `E2E_BASE_OFF_URL` | billing-off SPA origin; defaults to port 5175 |
+| `E2E_STRIPE_URL` | stub origin without `/v1/`; `http://127.0.0.1:4242` |
+| `E2E_STRIPE_OFFERS` | optional JSON offers (`id`, `priceId`, `amountCents`, `currency`, `interval`) |
+| `E2E_BILLING` | runner-owned switch: enables billing and stub setup |
+| `E2E_AI` | runner sets `0`; `1` expects successful AI Fill with a configured test adapter |
+| `E2E_API_DIR` | fixture checkout, defaults to this repo; runner-owned |
+| `E2E_MAILBOX_PATH` | mailbox JSON endpoint; `/dev/mailbox/json` |
+| `E2E_MAILBOX_CLEAR_PATH` | mailbox clear endpoint; `/dev/mailbox/clear` |
+
+For parallel checkouts, choose distinct databases, API ports, billing-off API ports, Vite ports
+and stub origins. When `E2E_BASE_URL` supplies an existing SPA, start both SPA servers yourself.
+`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `POOL_SIZE` and `ERL_FLAGS` also apply to this lane.
+Traces and reports live in ignored `frontend/test-results/` and `frontend/playwright-report/`.
+
+`frontend/e2e/backend.ts` is the per-kit fixture seam: `seedUser` creates confirmed accounts
 and bearers, bootstraps the first superadmin through `Accounts.bootstrap_superadmin`,
 `expireSudo` expires a session, and `sendOptionalEmail` queues mail for the running API.
-These use isolated `mix run` processes; user journeys still exercise the API. Global setup
-clears the mailbox once. `E2E_API_DIR` defaults to this checkout.
+These use isolated `mix run` processes; global setup clears the mailbox once.
 
 `pnpm lint` includes the catalogue audit. Prune unused keys with
 `node i18n/scripts/audit.mjs --prune`, review the diff, then run `pnpm i18n:build`.

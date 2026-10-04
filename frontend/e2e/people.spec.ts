@@ -9,7 +9,9 @@ test("invite a second user, accept, change role, remove, rejoin and leave; last 
   createUser,
 }) => {
   const second = await createUser()
-  const context = await browser.newContext({ baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173" })
+  const context = await browser.newContext({
+    baseURL: process.env.E2E_BASE_URL ?? `http://localhost:${process.env.E2E_VITE_PORT ?? "5174"}`,
+  })
   const guest = await context.newPage()
   try {
     await signedIn(page, user, "/settings/members")

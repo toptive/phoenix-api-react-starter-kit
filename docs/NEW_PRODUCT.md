@@ -2,22 +2,47 @@
 
 1. **Create the repo**: GitHub → `toptive/phoenix-api-react-starter-kit` → "Use this
    template" → private repo named after the product, and clone it.
-2. **Rename** (one commit):
+2. **Rename and install**:
    ```sh
    bin/rename --app visa_hub --module VisaHub --name "WH Visas" --domain whvisas.com
-   mix setup          # deps, pnpm, git hooks, database, seeds
-   mix check          # every gate green before the first commit
-   git commit -am "Rename the template to WH Visas"
+   mix setup          # deps, root pnpm, Chromium, git hooks, database, seeds
+   mix format         # the new module name can change Elixir line wrapping
    ```
-   `bin/rename` also updates the `starterkit:` storage prefix in the SPA and its inline bootstrap,
-   and regenerates cookie salts and dev/test secret keys.
+   Run from the repository root. The module/app names, package name, Docker release path,
+   deploy service/image/domain, native scheme, SPA storage prefix and inline appearance
+   bootstrap are rewritten together. Cookie salts and dev/test secret keys are regenerated.
+   Typelizer is vendored, so no sibling checkout is needed; its source is excluded from rename.
+   The script removes `.template-repo`, enabling the product launch checks. **Complete the
+   branding step below before `bin/check` and the first commit**: untouched template icons
+   and social cards deliberately fail the product gate.
 3. **Tenancy**: keep `config :visa_hub, :tenancy, :multi`, or set `:single` for a product with
    one shared organization ([TENANCY.md](TENANCY.md)).
 4. **Theme** ([DESIGN.md](DESIGN.md) "Re-skin checklist"): `frontend/src/styles/theme.css` tokens, fonts,
    logo, favicon (+ `bin/icons`), social cards (`bin/og-cards.mjs`), `:theme_color`, `:mail_brand`.
-   `placeholder_test.exs` fails until the favicon, icons, cards and deploy hosts are your own.
+   Replace `priv/static/favicon.svg` with the product mark, then generate the raster assets:
+   ```sh
+   # macOS prerequisites for branding scripts:
+   brew install librsvg imagemagick
+   pnpm i18n:build
+   bin/icons
+   bin/og-cards.mjs
+   ```
+   The cards read the renamed `app.name` and theme. `placeholder_test.exs` refuses any
+   untouched template brand file, name or public-host placeholder. The server IP and bucket
+   still need the product's deployment settings; rename does not provision infrastructure.
 5. **Copy and locales**: landing text and product name in `i18n/translations.csv` (`app.name`,
    `home.*`, `mail.*`); add a locale if needed ([I18N.md](I18N.md) "Adding a locale").
+   After branding and copy changes:
+   ```sh
+   mix typelizer.gen
+   bin/check          # all gates, including isolated browser journeys
+   docker build -t visa-hub:local .
+   git add -A
+   git commit -m "Rename the template to WH Visas"
+   ```
+   `bin/check` uses Vite 5174/5175, API 4100/4101 and local Stripe 4242, and drops its disposable
+   E2E database afterward. Use the `E2E_*` variables in [GATES.md](GATES.md) for parallel products.
+   See [DEPLOY.md](DEPLOY.md) for a local image boot with throwaway Postgres and `/health`.
 6. **Legal**: write terms, privacy and cookies in Admin → Legal documents and publish them.
 7. **Dev port**: pick a free Vite port for this product (`VITE_PORT=5181 mix phx.server`, or set it
    in your shell profile); open the SPA on that Vite port so several products run side by side.

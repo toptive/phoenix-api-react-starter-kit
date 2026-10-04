@@ -50,8 +50,12 @@ config :starter_kit, StarterKit.Billing,
   mode: :test,
   secret_key: "sk_test_fake",
   webhook_secret: "whsec_test_fake",
-  prices: %{"PRO_MONTHLY" => "price_test_monthly", "PRO_YEARLY" => "price_test_yearly"},
-  req_options: [plug: {Req.Test, StarterKit.Billing.Stripe}]
+  prices: %{"PRO_MONTHLY" => "price_test_monthly", "PRO_YEARLY" => "price_test_yearly"}
+
+if System.get_env("E2E") != "1" do
+  config :starter_kit, StarterKit.Billing,
+    req_options: [plug: {Req.Test, StarterKit.Billing.Stripe}]
+end
 
 # Turnstile off (the flag); tests turn it on with `put_flag(:turnstile, true)` and answer
 # for Cloudflare through Req.Test stubs.

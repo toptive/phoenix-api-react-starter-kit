@@ -552,12 +552,14 @@ defmodule StarterKit.Billing do
     "checkout-v1-#{org.id}-#{user.id}-#{offer.id}-#{offer_revision()}-#{user.locale}-#{hour}"
   end
 
-  # Never send a customer to a page Stripe did not host.
+  # Releases only return Stripe-hosted URLs. Tests may use the configured stub's origin.
   defp stripe_url(url, hosts) do
-    case URI.parse(url) do
-      %URI{scheme: "https", host: host} -> if host in hosts, do: :ok, else: unexpected()
-      _ -> unexpected()
-    end
+    uri = URI.parse(url)
+    stripe? = uri.scheme == "https" and uri.host in hosts and uri.port == 443
+    origin = {uri.scheme, uri.host, uri.port}
+    stub? = mode() == :test and origin == config(:test_api_origin)
+
+    if is_nil(uri.userinfo) and (stripe? or stub?), do: :ok, else: unexpected()
   end
 
   defp unexpected, do: {:error, :unexpected_stripe_url}

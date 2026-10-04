@@ -14,6 +14,7 @@ Never edit generated files or hand-write mirror response interfaces.
 The page generator is disabled. `routes: [naming: :controller_path]` uses the shared contract:
 plural URL resource names (`apiV1AuthMagicLinks`, `apiV1SettingsSessions`), nested resources
 concatenated (`apiV1AdminLegalDocumentsVersionsPublication`), and `destroy` for DELETE.
+Explicit `group_overrides` keep session singleton URLs in their plural contract groups.
 Helpers accept positional path parameters in URL order, then optional `{ query }` options.
 Files live under `routes/Api/V1/<Namespace>/<Controller>Controller.ts`, have default exports,
 and are re-exported by `index.ts`. The runtime exports `setBaseUrl` and `RouteDefinition`.
@@ -46,5 +47,7 @@ The generator excludes the SPA fallback, `/dev`, `/live` and `/admin/jobs` brows
 | `apiV1AuthGoogleCallback.create` | Google OAuth redirect, never called by SPA code |
 | `webhooksStripeEvents.create` | Stripe webhook delivery |
 
-Typelizer temporarily uses `path: "../typelizer-ex"` for controller-path naming.
-Swap back to the Hex dependency when this option is released; generator changes belong in the library.
+Typelizer is vendored at `vendor/typelizer` from the `route-naming-controller-path` branch,
+commit `38c0918`. This snapshot makes builds and new products independent of sibling checkouts.
+Swap to the Hex dependency once controller-path naming and `group_overrides` are released;
+generator changes belong in the library. Keep its MIT license with the snapshot.

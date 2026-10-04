@@ -14,6 +14,34 @@ Claude skill: it runs every gate, shows what changed, asks for confirmation and 
 
 Kamal builds from a clean clone of the committed `HEAD`: uncommitted changes never ship.
 
+The image needs typelizer on Hex **or vendored inside the build context**. A sibling
+`path: "../typelizer-ex"` dependency cannot build from a clean clone. The kit currently uses
+`vendor/typelizer` (source revision in [TYPE_CONTRACT.md](TYPE_CONTRACT.md)); the Dockerfile
+copies it before fetching dependencies and rejects the old sibling path with a clear error.
+Replace it with Hex only after the route naming options are published.
+
+For a local image smoke test, use a disposable database and fixture values:
+
+```sh
+docker build -t starter-kit:local .
+docker network create starter-kit-smoke
+docker run -d --name starter-kit-smoke-db --network starter-kit-smoke \
+  -e POSTGRES_PASSWORD=local_fixture -e POSTGRES_DB=starter_kit_smoke postgres:17
+docker run -d --name starter-kit-smoke-app --network starter-kit-smoke -p 4400:4000 \
+  -e DATABASE_URL=ecto://postgres:local_fixture@starter-kit-smoke-db:5432/starter_kit_smoke \
+  -e SECRET_KEY_BASE=local_fixture_local_fixture_local_fixture_local_fixture_local_fixture \
+  -e PHX_HOST=localhost -e SPA_ORIGIN=http://localhost:4400 \
+  -e CORS_ORIGINS=http://localhost:4400 -e POOL_SIZE=2 starter-kit:local
+curl -fsS http://localhost:4400/health
+docker image inspect starter-kit:local --format '{{.Size}}'
+docker rm -f starter-kit-smoke-app starter-kit-smoke-db
+docker network rm starter-kit-smoke
+```
+
+Wait for Postgres to become ready (`docker exec starter-kit-smoke-db pg_isready`) before
+starting the app. No mail, Stripe, analytics or storage credentials are needed for `/health`.
+The release runs migrations and the i18n sync before listening; it does not run seeds.
+
 ## Building on an Apple-silicon Mac
 
 The products droplet is x86_64, so `builder.arch: amd64`. Docker (OrbStack or Docker Desktop)

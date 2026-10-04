@@ -33,6 +33,19 @@ config :starter_kit,
         ["capacitor://localhost", "ionic://localhost", "http://localhost"]
     )
 
+# Local Stripe stubs are forbidden in releases, even when billing uses test keys.
+if base = env.("STRIPE_API_BASE") do
+  if config_env() == :prod, do: raise("STRIPE_API_BASE cannot be overridden in production")
+  uri = URI.parse(base)
+
+  unless uri.scheme in ["http", "https"] and is_binary(uri.host) and is_nil(uri.userinfo),
+    do: raise("STRIPE_API_BASE must be an HTTP(S) URL without credentials")
+
+  config :starter_kit, StarterKit.Billing,
+    req_options: [base_url: base],
+    test_api_origin: if(config_env() == :test, do: {uri.scheme, uri.host, uri.port})
+end
+
 # The Sentry library also reads SENTRY_DSN from the OS env by itself, and a blank exported
 # value would still turn it on. Remove the variable so "blank" means "off" everywhere.
 if is_nil(env.("SENTRY_DSN")), do: System.delete_env("SENTRY_DSN")

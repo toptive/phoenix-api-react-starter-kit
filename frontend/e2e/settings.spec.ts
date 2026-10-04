@@ -44,7 +44,9 @@ test("turn optional emails off and back on, preserving each choice after reload"
 test("sign out another device while this device stays signed in", async ({ page, browser, createUser, api }) => {
   const user = await createUser({ withPassword: true })
   const other = await api.call<AuthSession>(routes.apiV1AuthSessions.create(), { email: user.user.email, password })
-  const context = await browser.newContext({ baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173" })
+  const context = await browser.newContext({
+    baseURL: process.env.E2E_BASE_URL ?? `http://localhost:${process.env.E2E_VITE_PORT ?? "5174"}`,
+  })
   const secondPage = await context.newPage()
   try {
     await signedIn(secondPage, { ...user, ...other, token: other.token! })
@@ -102,7 +104,9 @@ test("changing the password replaces this bearer and revokes the other browser s
 }) => {
   const user = await createUser({ withPassword: true })
   const other = await api.call<AuthSession>(routes.apiV1AuthSessions.create(), { email: user.user.email, password })
-  const context = await browser.newContext({ baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173" })
+  const context = await browser.newContext({
+    baseURL: process.env.E2E_BASE_URL ?? `http://localhost:${process.env.E2E_VITE_PORT ?? "5174"}`,
+  })
   const otherPage = await context.newPage()
   const replacement = "Replacement-password-2026"
   try {
@@ -142,7 +146,9 @@ test("account deletion is blocked by ownership, then allowed after transferring 
   createUser,
 }) => {
   const second = await createUser()
-  const context = await browser.newContext({ baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173" })
+  const context = await browser.newContext({
+    baseURL: process.env.E2E_BASE_URL ?? `http://localhost:${process.env.E2E_VITE_PORT ?? "5174"}`,
+  })
   const guest = await context.newPage()
   try {
     await signedIn(page, user)

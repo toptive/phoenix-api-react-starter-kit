@@ -3,6 +3,33 @@ defmodule StarterKitWeb.ApiBillingConfigTest do
   import StarterKitWeb.ApiHelpers
   alias StarterKit.{Accounts, Billing}
 
+  defmodule StripeStub do
+    @moduledoc false
+    def init(opts), do: opts
+
+    def call(conn, opts) do
+      send(opts[:test], {:stub_request, conn.method, conn.request_path})
+      url = "http://localhost:#{conn.port}/redirect"
+
+      body =
+        if conn.method == "GET" do
+          %{
+            active: true,
+            livemode: false,
+            unit_amount: 1900,
+            currency: "usd",
+            recurring: %{interval: "month"}
+          }
+        else
+          %{url: url}
+        end
+
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.send_resp(200, Jason.encode!(body))
+    end
+  end
+
   setup %{conn: conn} do
     original = Application.get_env(:starter_kit, Billing)
     on_exit(fn -> Application.put_env(:starter_kit, Billing, original) end)
@@ -97,6 +124,123 @@ defmodule StarterKitWeb.ApiBillingConfigTest do
     assert current["sales"] == "open"
     assert hd(current["offers"])["amountCents"] == 2900
     refute current["offerRevision"] == first["offerRevision"]
+  end
+
+  test "E2E config reaches a local Stripe HTTP stub for checkout and portal", %{
+    auth: auth,
+    scope: scope
+  } do
+    pid = start_supervised!({Bandit, plug: {StripeStub, test: self()}, port: 0})
+    {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)
+    base = "http://localhost:#{port}/v1/"
+
+    config =
+      with_env(
+        %{
+          "E2E" => "1",
+          "E2E_PGDATABASE" => "starter_kit_e2e_config",
+          "PORT" => "4100",
+          "STRIPE_API_BASE" => base
+        },
+        fn ->
+          Config.Reader.merge(
+            Config.Reader.read!("config/config.exs", env: :test),
+            Config.Reader.read!("config/runtime.exs", env: :test)
+          )
+        end
+      )
+
+    billing = config[:starter_kit][Billing]
+    refute Keyword.has_key?(billing[:req_options], :plug)
+    Application.put_env(:starter_kit, Billing, billing)
+
+    assert json_response(post(auth, ~p"/api/v1/settings/billing/checkout-session", checkout()), 201)[
+             "data"
+           ] ==
+             %{"url" => "http://localhost:#{port}/redirect"}
+
+    assert_received {:stub_request, "GET", "/v1/prices/price_test_monthly"}
+    assert_received {:stub_request, "POST", "/v1/checkout/sessions"}
+
+    subscription_fixture(scope)
+
+    assert json_response(post(auth, ~p"/api/v1/settings/billing/portal-session", %{}), 201)["data"] ==
+             %{"url" => "http://localhost:#{port}/redirect"}
+
+    assert_received {:stub_request, "POST", "/v1/billing_portal/sessions"}
+  end
+
+  test "stub redirects require the exact origin and test billing mode", %{
+    auth: auth,
+    scope: scope,
+    original: original
+  } do
+    subscription = subscription_fixture(scope)
+    configure(original, test_api_origin: {"http", "localhost", 4200})
+
+    for url <- [
+          "http://localhost:4201/portal",
+          "https://localhost:4200/portal",
+          "http://127.0.0.1:4200/portal",
+          "http://localhost.evil.test:4200/portal",
+          "http://user@localhost:4200/portal",
+          "http://checkout.stripe.com/portal",
+          "https://billing.stripe.com:4200/portal"
+        ] do
+      Req.Test.stub(Billing.Stripe, &Req.Test.json(&1, %{url: url}))
+
+      assert_error(
+        post(auth, ~p"/api/v1/settings/billing/portal-session", %{}),
+        503,
+        "stripe_unavailable"
+      )
+    end
+
+    StarterKit.Repo.update!(Ecto.Changeset.change(subscription, livemode: true),
+      org_id: scope.organization.id
+    )
+
+    configure(original,
+      mode: :live,
+      secret_key: "sk_live_fake",
+      test_api_origin: {"http", "localhost", 4200}
+    )
+
+    Req.Test.stub(Billing.Stripe, &Req.Test.json(&1, %{url: "http://localhost:4200/portal"}))
+
+    assert_error(
+      post(auth, ~p"/api/v1/settings/billing/portal-session", %{}),
+      503,
+      "stripe_unavailable"
+    )
+  end
+
+  test "production config forbids a Stripe API override" do
+    with_env(
+      %{
+        "STRIPE_API_BASE" => "http://localhost:4200/v1/",
+        "SPA_ORIGIN" => "https://app.example.com",
+        "CORS_ORIGINS" => "https://app.example.com"
+      },
+      fn ->
+        assert_raise RuntimeError, "STRIPE_API_BASE cannot be overridden in production", fn ->
+          Config.Reader.read!("config/runtime.exs", env: :prod)
+        end
+      end
+    )
+  end
+
+  defp with_env(values, fun) do
+    original = Map.new(values, fn {key, _} -> {key, System.get_env(key)} end)
+    System.put_env(values)
+
+    try do
+      fun.()
+    after
+      for {key, value} <- original do
+        if value, do: System.put_env(key, value), else: System.delete_env(key)
+      end
+    end
   end
 
   defp checkout,

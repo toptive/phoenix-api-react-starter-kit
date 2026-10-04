@@ -31,6 +31,10 @@ ENV MIX_ENV=prod
 RUN mix local.hex --force && mix local.rebar --force
 
 COPY mix.exs mix.lock ./
+COPY vendor/typelizer vendor/typelizer
+RUN if grep -Eq 'path: "\.\./typelizer-ex"' mix.exs; then \
+      echo "typelizer path dependency cannot be built in Docker: use Hex or vendor/typelizer (docs/DEPLOY.md)" >&2; exit 1; \
+    fi
 RUN mix deps.get --only prod && mkdir config
 COPY config/config.exs config/prod.exs config/
 RUN mix deps.compile

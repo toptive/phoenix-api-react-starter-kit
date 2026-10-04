@@ -34,7 +34,3 @@ config :starter_kit, StarterKit.AI,
   openrouter_api_key: nil,
   fal_key: nil,
   google_api_key: nil
-
-# Fixture values only: this endpoint is the local Stripe stub, never Stripe itself.
-config :starter_kit, StarterKit.Billing,
-  req_options: [base_url: System.get_env("E2E_STRIPE_URL", "http://localhost:4200/v1/")]

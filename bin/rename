@@ -31,10 +31,10 @@ random = fn bytes -> bytes |> :crypto.strong_rand_bytes() |> Base.encode64(paddi
 files =
   files
   |> String.split("\n", trim: true)
-  |> Enum.reject(&String.match?(&1, ~r/\.(png|jpg|jpeg|gif|ico|woff2?|lock)$|^bin\/rename$|pnpm-lock\.yaml$/))
+  |> Enum.reject(&String.match?(&1, ~r/\.(png|jpg|jpeg|gif|ico|woff2?|lock)$|^bin\/rename$|pnpm-lock\.yaml$|^vendor\//))
 
 replacements = [
-  # display name first (quoted "StarterKit" strings and prose)
+  # Human-facing copy uses the display name, while code uses the module.
   {~r/"StarterKit"/, ~s("#{name}")},
   {~r/StarterKit —/, "#{name} —"},
   {"CHANGE_ME.example.com", domain},
@@ -50,7 +50,8 @@ replacements = [
 salts = [
   {~r/signing_salt: "[^"]+"/, fn -> ~s(signing_salt: "#{random.(8)}") end},
   {~r/encryption_salt: "[^"]+"/, fn -> ~s(encryption_salt: "#{random.(8)}") end},
-  {~r/secret_key_base: "[^"]+"/, fn -> ~s(secret_key_base: "#{random.(64)}") end}
+  {~r/secret_key_base: "[^"]+"/, fn -> ~s(secret_key_base: "#{random.(64)}") end},
+  {~r/secret_key_base = "[^"]+"/, fn -> ~s(secret_key_base = "#{random.(64)}") end}
 ]
 
 changed =
@@ -94,6 +95,6 @@ unless opts[:dry_run], do: File.rm(".template-repo")
 
 IO.puts("""
 Renamed to #{module} (#{app}), "#{name}", #{domain}: #{changed} files rewritten, #{length(moves)} paths moved.
-Next: mix setup, then follow docs/NEW_PRODUCT.md. placeholder_test.exs fails until the
+Next: mix setup, mix format, then follow docs/NEW_PRODUCT.md. placeholder_test.exs fails until the
 favicon (bin/icons), the social cards (bin/og-cards.mjs) and the deploy hosts are your own.
 """)

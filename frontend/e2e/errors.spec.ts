@@ -18,7 +18,9 @@ test("a member opening the manager-only onboarding route sees the forbidden page
   const second = await createUser()
   await signedIn(page, user)
   await invite(page, second.user.email)
-  const context = await browser.newContext({ baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173" })
+  const context = await browser.newContext({
+    baseURL: process.env.E2E_BASE_URL ?? `http://localhost:${process.env.E2E_VITE_PORT ?? "5174"}`,
+  })
   const member = await context.newPage()
   try {
     await signedIn(member, second)

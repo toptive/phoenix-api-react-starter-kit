@@ -138,6 +138,14 @@ config :typelizer,
   # Browser delivery and jobs are outside the JSON API contract.
   routes: [
     naming: :controller_path,
+    group_overrides: %{
+      StarterKitWeb.Api.V1.Auth.SessionController => "/api/v1/auth/sessions",
+      StarterKitWeb.Api.V1.Auth.MagicLinkSessionController => "/api/v1/auth/magic-links/sessions",
+      StarterKitWeb.Api.V1.Settings.BillingCheckoutSessionController =>
+        "/api/v1/settings/billing/checkout-sessions",
+      StarterKitWeb.Api.V1.Settings.BillingPortalSessionController =>
+        "/api/v1/settings/billing/portal-sessions"
+    },
     exclude: ["/dev", "/live", ~r{^/admin/jobs}E, "/*path"],
     defaults: []
   ]

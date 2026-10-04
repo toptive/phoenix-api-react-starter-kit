@@ -10,16 +10,23 @@ export PORT="${E2E_PORT:-4100}"
 export POOL_SIZE="${POOL_SIZE:-5}"
 export ERL_FLAGS="${ERL_FLAGS:-+S 2:2}"
 export E2E_API_URL="http://localhost:$PORT"
-export SPA_ORIGIN="${E2E_BASE_URL:-http://localhost:5173}"
-export E2E_AI=0 E2E_ADMIN=1 E2E_BILLING=0
+export E2E_VITE_PORT="${E2E_VITE_PORT:-5174}"
+export E2E_BASE_OFF_URL="${E2E_BASE_OFF_URL:-http://localhost:$((E2E_VITE_PORT + 1))}"
+export SPA_ORIGIN="${E2E_BASE_URL:-http://localhost:$E2E_VITE_PORT}"
+export E2E_AI=0 E2E_BILLING=0
 if [ -f frontend/e2e/stripe-stub.mjs ]; then
   export E2E_BILLING=1
-  export E2E_STRIPE_URL="${E2E_STRIPE_URL:-http://localhost:4200/v1/}"
+  export E2E_STRIPE_URL="${E2E_STRIPE_URL:-http://127.0.0.1:4242}"
+  export STRIPE_API_BASE="$E2E_STRIPE_URL/v1/"
+  export STRIPE_TEST_WEBHOOK_SECRET="whsec_test_fake"
+  export STRIPE_TEST_PRICE_PRO_MONTHLY="price_test_monthly"
+  export STRIPE_TEST_PRICE_PRO_YEARLY="price_test_yearly"
 fi
 # Keep this run independent of configured external providers.
 unset OPENROUTER_API_KEY FAL_KEY GOOGLE_API_KEY SENTRY_DSN MAIL_ALLOWED_RECIPIENTS
 log_dir=$(mktemp -d "${TMPDIR:-/tmp}/phoenix-e2e.XXXXXX")
 api_pid=""
+database_owned=false
 cleanup() {
   status=$?
   trap - EXIT INT TERM
@@ -28,6 +35,10 @@ cleanup() {
     wait "$api_pid" 2>/dev/null || true
   fi
   if [ "$status" -ne 0 ]; then cat "$log_dir/api.log" 2>/dev/null || true; fi
+  if [ "$database_owned" = true ] && ! mix ecto.drop --quiet >"$log_dir/drop.log" 2>&1; then
+    cat "$log_dir/drop.log" >&2
+    status=1
+  fi
   rm -rf "$log_dir"
   exit "$status"
 }
@@ -39,6 +50,7 @@ if curl --silent --fail "$E2E_API_URL/health" >/dev/null; then
   exit 1
 fi
 mix ecto.create --quiet
+database_owned=true
 mix ecto.migrate --quiet
 mix run --no-halt >"$log_dir/api.log" 2>&1 &
 api_pid=$!

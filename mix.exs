@@ -80,8 +80,8 @@ defmodule StarterKit.MixProject do
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       {:ex_check, "~> 0.17", only: [:dev, :test], runtime: false},
       # Type contract (serializers → TypeScript). docs/TYPE_CONTRACT.md
-      {:typelizer, path: "../typelizer-ex"}
-      # Swap back to {:typelizer, "~> 0.2"} once controller-path naming is released on Hex.
+      {:typelizer, path: "vendor/typelizer"}
+      # Vendored until controller-path naming and group_overrides are released on Hex.
     ]
   end
 
@@ -96,6 +96,7 @@ defmodule StarterKit.MixProject do
       setup: [
         "deps.get",
         "cmd pnpm install",
+        "cmd pnpm exec playwright install chromium",
         "cmd git config core.hooksPath .githooks",
         "ecto.setup"
       ],
