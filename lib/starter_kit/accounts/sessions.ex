@@ -2,7 +2,7 @@ defmodule StarterKit.Accounts.Sessions do
   @moduledoc false
   import Ecto.Query
   alias StarterKit.{Accounts, Audit, Repo}
-  alias StarterKit.Accounts.{Scope, Session, User, UserToken}
+  alias StarterKit.Accounts.{Impersonation, Scope, Session, User, UserToken}
 
   def generate_api_token(user, device \\ %{}, opts \\ []) do
     encoded = Base.url_encode64(:crypto.strong_rand_bytes(32), padding: false)
@@ -15,7 +15,7 @@ defmodule StarterKit.Accounts.Sessions do
         user_id: user.id,
         token_hash: digest(encoded),
         organization_id: opts[:organization_id] || user.last_organization_id,
-        expires_at: DateTime.add(timestamp, 14, :day),
+        expires_at: DateTime.add(timestamp, if(impersonator_id, do: 8, else: 336), :hour),
         authenticated_at: authenticated_at,
         sudo_until: if(is_nil(impersonator_id), do: DateTime.add(authenticated_at, 10, :minute)),
         impersonator_user_id: impersonator_id,
@@ -52,7 +52,8 @@ defmodule StarterKit.Accounts.Sessions do
     base = from s in Session, where: s.id == ^session.id and is_nil(s.revoked_at)
 
     cond do
-      DateTime.before?(session.expires_at, expiry_threshold) ->
+      is_nil(session.impersonator_user_id) and
+          DateTime.before?(session.expires_at, expiry_threshold) ->
         query = where(base, [s], s.expires_at < ^expiry_threshold)
         changes = [expires_at: DateTime.add(timestamp, 14, :day), last_used_at: timestamp]
         touch_if_current(session, query, changes)
@@ -170,9 +171,18 @@ defmodule StarterKit.Accounts.Sessions do
   defp verify_sudo(_user, _attrs), do: {:error, :bad_request}
 
   defp persist_sudo(session) do
-    session
-    |> Ecto.Changeset.change(authenticated_at: now(), sudo_until: DateTime.add(now(), 10, :minute))
-    |> Repo.update()
+    Repo.transact(fn ->
+      with {:ok, updated} <-
+             session
+             |> Ecto.Changeset.change(
+               authenticated_at: now(),
+               sudo_until: DateTime.add(now(), 10, :minute)
+             )
+             |> Repo.update() do
+        Audit.record("user.sudo_authenticated", actor: Accounts.get_user!(session.user_id))
+        {:ok, updated}
+      end
+    end)
   end
 
   def set_session_organization(session, organization_id) do
@@ -234,6 +244,7 @@ defmodule StarterKit.Accounts.Sessions do
             (like(t.context, "change_email:%") and t.inserted_at < ago(7, "day"))
     )
 
+    Repo.delete_all(from i in Impersonation, where: i.ended_at < ago(90, "day"))
     :ok
   end
 

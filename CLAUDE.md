@@ -41,11 +41,11 @@ lib/starter_kit/            domain — one boundary per context (accounts, organ
 lib/starter_kit/<ctx>/      schemas, policies (exported), helper modules and workers (private)
 lib/starter_kit/*.ex        platform modules: analytics, notifications, mailer, ai, uploads, monitoring
 lib/starter_kit_web/        router, REST controllers, serializers, plugs, SEO, Vite tags
-assets/js/pages/            one React page per controller action (kebab-case paths)
-assets/js/components/ui/    shadcn primitives — OWNED, edit them freely
-assets/js/components/app/   shared app components (FormStepper, FieldHelp, ConfirmDialog, …)
-assets/js/layouts/          public, auth, app (sidebar), settings, admin
-assets/js/generated/        typelizer output — never edit
+frontend/src/pages/            one React page per controller action (kebab-case paths)
+frontend/src/components/ui/    shadcn primitives — OWNED, edit them freely
+frontend/src/components/app/   shared app components (FormStepper, FieldHelp, ConfirmDialog, …)
+frontend/src/layouts/          public, auth, app (sidebar), settings, admin
+frontend/src/api/generated/        typelizer output — never edit
 assets/css/theme.css        the only file a product edits to re-skin
 i18n/                       translations.csv → locales/*.json, scripts
 credo/, test/architecture/  our rules, executable

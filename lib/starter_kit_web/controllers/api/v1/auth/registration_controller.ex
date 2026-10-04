@@ -11,7 +11,7 @@ defmodule StarterKitWeb.Api.V1.Auth.RegistrationController do
     conn = skip_authorization(conn)
     attrs = Map.put_new(params, "locale", locale(conn))
 
-    case Organizations.register_user(attrs, &ApiAuth.spa_url("/auth/magic-links/#{&1}"),
+    case Organizations.register_user(attrs, &ApiAuth.spa_url("/magic-links/#{&1}"),
            ip_address: ApiAuth.device(conn).ip_address
          ) do
       {:ok, user} ->

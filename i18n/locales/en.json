@@ -548,5 +548,6 @@
   "errors.api.turnstile_failed": "Complete the verification and try again.",
   "errors.api.email_not_verified": "Google has not verified your email address.",
   "errors.api.state_invalid": "This sign-in attempt has expired. Try again.",
-  "validation.limit_reached": "This plan allows up to {{limit}} people."
+  "validation.limit_reached": "This plan allows up to {{limit}} people.",
+  "errors.api.method_not_allowed": "This request method is not allowed."
 }

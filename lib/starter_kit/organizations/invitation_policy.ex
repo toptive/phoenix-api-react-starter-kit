@@ -7,8 +7,9 @@ defmodule StarterKit.Organizations.InvitationPolicy do
   alias StarterKit.Organizations.{Invitation, OrganizationPolicy}
 
   @impl true
-  def authorize(%Scope{} = scope, action, Invitation) when action in [:index, :new, :create],
-    do: OrganizationPolicy.manager?(scope)
+  def authorize(%Scope{} = scope, action, Invitation)
+      when action in [:index, :new, :create, :delete],
+      do: OrganizationPolicy.manager?(scope)
 
   def authorize(%Scope{} = scope, :delete, %Invitation{organization_id: org_id}),
     do: Scope.organization_id(scope) == org_id and OrganizationPolicy.manager?(scope)

@@ -609,9 +609,9 @@ defmodule StarterKit.Organizations do
     Repo.transact(fn ->
       with {:ok, invitation} <- get_open_invitation(token),
            invitation <-
-             Repo.get!(Invitation, invitation.id,
-               org_id: invitation.organization_id,
-               lock: "FOR UPDATE"
+             Repo.one!(
+               from(i in Invitation, where: i.id == ^invitation.id, lock: "FOR UPDATE"),
+               org_id: invitation.organization_id
              ),
            true <- Invitation.open?(invitation) || {:error, :invitation_invalid},
            true <-

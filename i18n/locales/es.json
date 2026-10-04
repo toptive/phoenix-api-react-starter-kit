@@ -548,5 +548,6 @@
   "errors.api.turnstile_failed": "Completá la verificación y probá de nuevo.",
   "errors.api.email_not_verified": "Google no verificó tu dirección de email.",
   "errors.api.state_invalid": "Este intento de ingreso venció. Probá de nuevo.",
-  "validation.limit_reached": "Este plan permite hasta {{limit}} personas."
+  "validation.limit_reached": "Este plan permite hasta {{limit}} personas.",
+  "errors.api.method_not_allowed": "Este método de solicitud no está permitido."
 }

@@ -38,7 +38,7 @@ defmodule StarterKitWeb.Api.V1.Settings.InvitationController do
   end
 
   def delete(conn, %{"id" => id}) do
-    conn = authorize!(conn, :index, Invitation)
+    conn = authorize!(conn, :delete, Invitation)
 
     case Organizations.revoke_invitation(scope(conn), id) do
       {:ok, _} -> send_resp(conn, 204, "")

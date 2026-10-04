@@ -11,7 +11,7 @@ defmodule StarterKitWeb.Responses do
   alias StarterKitWeb.Plugs.PublicPage
 
   @doc "SPA sign-in destination for unconverted browser areas."
-  def spa_sign_in_url, do: StarterKitWeb.ApiAuth.spa_url("/auth/session")
+  def spa_sign_in_url, do: StarterKitWeb.ApiAuth.spa_url("/session/new")
 
   @doc "The current scope."
   def scope(conn), do: conn.assigns[:current_scope]

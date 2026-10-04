@@ -54,13 +54,6 @@ defmodule StarterKitWeb.Router do
     plug :accepts, ["json"]
   end
 
-  # RFC 8058 one-click unsubscribe: mail clients POST with no session and no CSRF token;
-  # the signed token in the URL is the authorization.
-  pipeline :one_click do
-    plug :accepts, ["html", "json"]
-    plug :put_secure_browser_headers, %{"content-security-policy" => "default-src 'none'"}
-  end
-
   # Public pages: a cookie-free, server-side page view (Plugs.PageViews).
   pipeline :page_views do
     plug Plugs.PageViews

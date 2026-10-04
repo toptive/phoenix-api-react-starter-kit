@@ -542,7 +542,7 @@ defmodule StarterKitWeb.ApiOrganizationsTest do
              202
            )
 
-    token = email_token("/auth/magic-links/")
+    token = email_token("/magic-links/")
 
     assert json_response(get(conn, ~p"/api/v1/auth/magic-links/#{token}"), 200)["data"]["confirmed"] ==
              false
@@ -586,7 +586,7 @@ defmodule StarterKitWeb.ApiOrganizationsTest do
              202
            )
 
-    invitee_token = email_token("/auth/magic-links/")
+    invitee_token = email_token("/magic-links/")
 
     invitee_session =
       post(conn, ~p"/api/v1/auth/magic-links/#{invitee_token}/session", %{}) |> json_response(201)

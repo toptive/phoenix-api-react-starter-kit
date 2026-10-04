@@ -35,7 +35,7 @@ defmodule StarterKitWeb.SignupTest do
         capture_token(&Accounts.request_email_change(scope, %{"email" => unique_email()}, &1))
 
       scanner = get(build_conn(), ~p"/settings/email-confirmations/#{token}")
-      assert redirected_to(scanner) =~ "http://localhost:5173/auth/session"
+      assert redirected_to(scanner) =~ "http://localhost:5173/session/new"
       assert Accounts.get_email_change(user, token)
     end
   end

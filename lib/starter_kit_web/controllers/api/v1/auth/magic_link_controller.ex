@@ -13,7 +13,7 @@ defmodule StarterKitWeb.Api.V1.Auth.MagicLinkController do
     conn = skip_authorization(conn)
 
     if is_binary(email) do
-      case Accounts.deliver_login_instructions(email, &ApiAuth.spa_url("/auth/magic-links/#{&1}")) do
+      case Accounts.deliver_login_instructions(email, &ApiAuth.spa_url("/magic-links/#{&1}")) do
         :ok ->
           conn
           |> put_status(202)

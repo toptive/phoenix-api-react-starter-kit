@@ -74,7 +74,7 @@ defmodule StarterKitWeb.EmailOptOutTest do
     assert email.headers["List-Unsubscribe"] =~ "http://localhost:4000/api/v1/email-subscriptions/"
     assert email.headers["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
     assert email.text_body =~ "http://localhost:5173/email-subscriptions/"
-    assert email.text_body =~ "http://localhost:5173/settings/email-preferences"
+    assert email.text_body =~ "http://localhost:5173/settings/email-preferences/edit"
   end
 
   test "opt-out is limited to 120 per minute", ctx do

@@ -34,7 +34,7 @@ defmodule StarterKitWeb.ApiHelpers do
 
   def request_magic(conn, email) do
     assert json_response(post(conn, "/api/v1/auth/magic-links", %{email: email}), 202)
-    email_token("/auth/magic-links/")
+    email_token("/magic-links/")
   end
 
   def current_auth(conn),

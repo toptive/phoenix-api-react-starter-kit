@@ -139,7 +139,7 @@ defmodule StarterKit.Notifications do
 
   @doc "The settings page where a signed-in user turns optional mail on or off."
   def preferences_url,
-    do: "#{Application.fetch_env!(:starter_kit, :spa_origin)}/settings/email-preferences"
+    do: "#{Application.fetch_env!(:starter_kit, :spa_origin)}/settings/email-preferences/edit"
 
   @doc """
   Reads an unsubscribe token: `{:ok, user_id, email_hash}` or `:error`. Compare the hash

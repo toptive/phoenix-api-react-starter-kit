@@ -2,7 +2,7 @@ defmodule StarterKitWeb.ApiAuthTest do
   use StarterKitWeb.ConnCase, async: true
   import Ecto.Query
   import StarterKitWeb.ApiHelpers
-  alias StarterKit.{Accounts, Repo}
+  alias StarterKit.{Accounts, Audit, Repo}
   alias StarterKit.Accounts.{Impersonation, Session, UserToken}
 
   setup %{conn: conn}, do: %{conn: api_conn(conn)}
@@ -118,7 +118,7 @@ defmodule StarterKitWeb.ApiAuthTest do
       )
 
     assert json_response(response, 202)["data"] == %{"email" => email, "newAccount" => true}
-    token = email_token("/auth/magic-links/")
+    token = email_token("/magic-links/")
 
     assert json_response(get(conn, ~p"/api/v1/auth/magic-links/#{token}"), 200)["data"] == %{
              "email" => email,
@@ -229,6 +229,11 @@ defmodule StarterKitWeb.ApiAuthTest do
              200
            )["data"]["sudoUntil"]
 
+    assert Repo.aggregate(
+             from(a in Audit.AuditEvent, where: a.action == "user.sudo_authenticated"),
+             :count
+           ) == 1
+
     wrong = request_magic(conn, user_fixture().email)
 
     assert_error(
@@ -317,8 +322,10 @@ defmodule StarterKitWeb.ApiAuthTest do
     ]
 
     impersonation = Accounts.generate_api_token(target, %{}, opts)
+    assert DateTime.diff(impersonation.expires_at, impersonation.session.inserted_at) == 8 * 60 * 60
     auth = bearer(conn, impersonation.token)
     bootstrap = current_auth(auth)
+    assert Repo.get!(Session, impersonation.session.id).expires_at == impersonation.expires_at
     refute bootstrap["superadmin"]
     assert bootstrap["impersonator"]["id"] == admin.id
     assert bootstrap["sudoUntil"] == nil
@@ -373,8 +380,8 @@ defmodule StarterKitWeb.ApiAuthTest do
   test "unsupported methods, media types, malformed JSON and missing paths use envelopes", %{
     conn: conn
   } do
-    assert_error(patch(conn, ~p"/api/v1/auth/sessions", %{}), 405, "bad_request")
-    assert_error(get(conn, ~p"/api/v1/auth/sessions"), 405, "bad_request")
+    assert_error(patch(conn, ~p"/api/v1/auth/sessions", %{}), 405, "method_not_allowed")
+    assert_error(get(conn, ~p"/api/v1/auth/sessions"), 405, "method_not_allowed")
 
     assert_error(
       conn
@@ -427,7 +434,7 @@ defmodule StarterKitWeb.ApiAuthTest do
                202
              )
 
-      token = email_token("/auth/magic-links/")
+      token = email_token("/magic-links/")
       result = post(conn, ~p"/api/v1/auth/magic-links/#{token}/session", %{}) |> json_response(201)
       assert current_auth(bearer(conn, result["data"]["token"]))["membership"]["role"] == "owner"
     end
@@ -464,5 +471,27 @@ defmodule StarterKitWeb.ApiAuthTest do
     assert current_auth(auth)["impersonator"]["id"] == admin.id
     assert response(delete(bearer(conn, original.token), ~p"/api/v1/auth/session"), 204) == ""
     assert_error(get(auth, ~p"/api/v1/bootstrap"), 401, "session_expired")
+  end
+
+  test "daily purge removes only ended impersonations older than 90 days" do
+    admin = superadmin_fixture()
+    target = user_fixture()
+    scope = Accounts.Scope.for_user(admin)
+    {:ok, old} = Accounts.start_impersonation(scope, target, %{reason: "Old support"})
+    {:ok, recent} = Accounts.start_impersonation(scope, target, %{reason: "Recent support"})
+    {:ok, running} = Accounts.start_impersonation(scope, target, %{reason: "Running support"})
+
+    Repo.update!(
+      Ecto.Changeset.change(old, ended_at: DateTime.add(DateTime.utc_now(:second), -91, :day))
+    )
+
+    Repo.update!(
+      Ecto.Changeset.change(recent, ended_at: DateTime.add(DateTime.utc_now(:second), -89, :day))
+    )
+
+    assert :ok = Accounts.purge_expired_tokens()
+    refute Repo.get(Impersonation, old.id)
+    assert Repo.get(Impersonation, recent.id)
+    assert Repo.get(Impersonation, running.id)
   end
 end

@@ -549,3 +549,4 @@
 "errors.api.email_not_verified","Google has not verified your email address.","Google no verificó tu dirección de email."
 "errors.api.state_invalid","This sign-in attempt has expired. Try again.","Este intento de ingreso venció. Probá de nuevo."
 "validation.limit_reached","This plan allows up to {{limit}} people.","Este plan permite hasta {{limit}} personas."
+errors.api.method_not_allowed,This request method is not allowed.,Este método de solicitud no está permitido.

@@ -10,7 +10,7 @@ defmodule StarterKitWeb.Plugs.ApiTransport do
   @impl true
   def call(%{path_info: ["api", "v1" | _]} = conn, _opts) do
     cond do
-      wrong_method?(conn) -> conn |> Responses.render_error(405, :bad_request) |> halt()
+      wrong_method?(conn) -> conn |> Responses.render_error(405, :method_not_allowed) |> halt()
       unsupported_type?(conn) -> conn |> Responses.render_error(415, :bad_request) |> halt()
       true -> parse(conn)
     end
