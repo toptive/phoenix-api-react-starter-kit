@@ -47,3 +47,7 @@ starter_kit-*.tar
 
 # frontend build artefacts
 frontend/node_modules/
+
+# Browser test artifacts
+frontend/test-results/
+frontend/playwright-report/

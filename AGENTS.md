@@ -6,7 +6,7 @@ This repository is the **Toptive base template**: every product starts as a copy
 
 One Mix project and one `package.json` at the root. Frontend commands run from the root:
 `pnpm dev` (started by `mix phx.server`), `pnpm build`, `pnpm typecheck`, `pnpm lint`,
-`pnpm test`, `pnpm i18n:build`. Never add a second `package.json` or a workspace.
+`pnpm test`, `pnpm e2e`, `pnpm e2e:ui`, `pnpm i18n:build`. Never add a second `package.json` or a workspace.
 
 ## Non-negotiables
 
@@ -108,6 +108,8 @@ Details: [docs/TYPE_CONTRACT.md](docs/TYPE_CONTRACT.md).
   generator owns them once it emits the contract. Never add hand-written mirror response types.
 - **We own the components.** Edit `components/ui` for app-wide changes; repeated patterns live
   in `components/app`. Theme tokens only; new colours go in `frontend/src/css/theme.css`.
+- Profile has name and language only; `FileField` stays available for product forms. Admin Jobs
+  appears only with `app.jobsDashboard` and opens the ticket URL returned by the API in a new tab.
 - Files and folders are kebab-case (generated files follow the generator). Pages mirror resources:
   `pages/<resource>/<action>.tsx`. Every UI string comes from `i18n/translations.csv`.
 
@@ -142,8 +144,13 @@ Details: [docs/TYPE_CONTRACT.md](docs/TYPE_CONTRACT.md).
 - **There is no CI.** Four layers: `.claude/hooks/architecture-check` (after each Claude edit),
   `.githooks/pre-commit` (staged files), `.githooks/pre-push` (`mix check`), `/deploy` (again).
   `mix setup` installs the hooks. Details: [docs/GATES.md](docs/GATES.md).
-- Every context function has a test; every page renders in a controller test (typelizer validates
-  its props); every tenant schema has an isolation test.
+- Prefer HTTP request and flow tests through the real router, auth, policies, database and serializers.
+  Every tenant schema has an isolation test. Unit tests are for branching business logic.
+- SPA journeys live in `frontend/e2e/` and run in Chromium against the real kit API (`pnpm e2e`).
+  Never mock the browser's API. Vitest is for pure functions and HTTP envelope handling only;
+  no component render tests with mocked APIs. Backend lanes own API boot and external HTTP stubs.
+- `pnpm lint` includes the catalogue audit: every used key has English and Spanish; unused keys
+  are removed while preserving backend keys and dynamic/plural families.
 
 ## Deploy
 

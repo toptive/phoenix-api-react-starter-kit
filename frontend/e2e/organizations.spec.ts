@@ -1,0 +1,21 @@
+import { test, expect, text, signedIn } from "./fixtures"
+
+test("create a workspace, rename it, switch back and retain the choice on reload", async ({ page, user, api }) => {
+  await signedIn(page, user)
+  await page.getByRole("button", { name: new RegExp(user.workspace) }).click()
+  await page.getByRole("menuitem", { name: text("organizations.create"), exact: true }).click()
+  await page.getByLabel(text("fields.organization_name"), { exact: true }).fill("Second Browser Team")
+  await page.getByRole("button", { name: text("organizations.new.submit"), exact: true }).click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page.getByRole("button", { name: /Second Browser Team/ })).toBeVisible()
+  await page.goto("/settings/organization/edit")
+  await page.getByLabel(text("fields.organization_name"), { exact: true }).fill("Renamed Browser Team")
+  await page.getByRole("button", { name: text("common.save_changes"), exact: true }).click()
+  await expect(page.getByRole("button", { name: /Renamed Browser Team/ })).toBeVisible()
+  await page.getByRole("button", { name: /Renamed Browser Team/ }).click()
+  await page.getByRole("menuitem", { name: user.workspace, exact: true }).click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await page.reload()
+  await expect(page.getByRole("button", { name: new RegExp(user.workspace) })).toBeVisible()
+  expect((await api.bootstrap(user.token)).auth!.organizations).toHaveLength(2)
+})

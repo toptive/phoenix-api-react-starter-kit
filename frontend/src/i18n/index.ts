@@ -39,6 +39,7 @@ export function applyTranslations(instance: I18n, locale: string, translations: 
 }
 const stored = typeof localStorage === "undefined" ? null : localStorage.getItem(storageKey("locale"))
 export const i18n = createI18n(stored ?? "en")
+if (typeof document !== "undefined") document.documentElement.lang = i18n.language
 i18n.on("languageChanged", (locale) => {
   if (typeof document !== "undefined") document.documentElement.lang = locale
   if (typeof localStorage !== "undefined") localStorage.setItem(storageKey("locale"), locale)

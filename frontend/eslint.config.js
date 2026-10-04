@@ -141,7 +141,7 @@ export default tseslint.config(
   },
   {
     basePath: import.meta.dirname,
-    files: ["*.config.{js,ts}", "scripts/**/*.mjs"],
+    files: ["*.config.{js,ts}", "scripts/**/*.mjs", "e2e/**/*.ts"],
     languageOptions: { globals: { ...globals.node } },
   },
   {

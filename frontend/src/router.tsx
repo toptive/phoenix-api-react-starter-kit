@@ -77,7 +77,22 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
     }
     const bootstrap = await context.queryClient.ensureQueryData(bootstrapOptions())
     const prefix = location.pathname.split("/")[1] ?? ""
-    const search = location.search as Record<string, unknown>
+    const search = Object.fromEntries(new URLSearchParams(location.searchStr))
+    // Bootstrap supplies the locale contract. On a cold deep link, validateSearch
+    // ran before it was available; preserve supported filters after bootstrap.
+    const schema =
+      location.pathname === paths.adminTranslations
+        ? translationSearchSchema
+        : ([paths.adminUsers, paths.adminOrganizations, paths.adminAuditEvents] as string[]).includes(location.pathname)
+          ? listSearchSchema
+          : location.pathname === paths.billing
+            ? billingSearchSchema
+            : null
+    if (schema) {
+      const expected = schema.parse(search)
+      if (JSON.stringify(expected) !== JSON.stringify(schema.parse(location.search)))
+        throw redirect({ to: location.pathname, search: expected, replace: true })
+    }
     const requested = bootstrap.locales.includes(prefix) ? prefix : search.locale
     const locale = typeof requested === "string" && bootstrap.locales.includes(requested) ? requested : bootstrap.locale
     restoreLocale(locale)
@@ -86,7 +101,6 @@ const rootRoute = createRootRouteWithContext<RouterContext>()({
   },
 })
 const homeComponent = lazyRouteComponent(() => import("@/pages/home/show"))
-const reservedComponent = lazyRouteComponent(() => import("@/pages/reserved"))
 const authSearch = (search: Record<string, unknown>): Record<string, string> =>
   Object.fromEntries(
     Object.entries(search)
@@ -100,7 +114,7 @@ const authSearch = (search: Record<string, unknown>): Record<string, string> =>
 const localeSearch = (search: Record<string, unknown>) => ({
   ...(typeof search.locale === "string" ? { locale: search.locale } : {}),
 })
-const route = (path: string, guard: Guard, shell: Shell, component = reservedComponent) =>
+const route = (path: string, guard: Guard, shell: Shell, component: typeof homeComponent) =>
   createRoute({
     getParentRoute: () => rootRoute,
     path,
@@ -190,7 +204,12 @@ const routes = [
     "auth",
     lazyRouteComponent(() => import("@/pages/invitations/show")),
   ),
-  route("/email-subscriptions/$token/opt-out", "public", "auth"),
+  route(
+    "/email-subscriptions/$token/opt-out",
+    "public",
+    "auth",
+    lazyRouteComponent(() => import("@/pages/email-opt-out/show")),
+  ),
   route(
     "/dashboard",
     "user",

@@ -40,7 +40,7 @@ App components: `FormStepper` (multi-step forms with review), `FormField` + `Fie
 (label, help and error wired for screen readers), `ConfirmDialog`, `AlertBanner`, `EmptyState`,
 `StatusBadge`, `DataTable`, `Pagination`, `SearchForm`, `PageHeader`, `SettingsSection`, `Seo`,
 `LegalBody`, `LocaleSwitcher`, `AppearanceToggle`, `OrganizationSwitcher`, `UserMenu`,
-`ImpersonationBanner`, `Logo`, `TextLink`.
+`ImpersonationBanner`, `SudoProvider`, `FileField`, `Logo`, `TextLink`.
 
 `FormStepper` moves focus to each new step's heading (never on page load), shows a refused
 step's `validationMessage` as an alert, can mark the last step as the review
@@ -86,3 +86,12 @@ and route helpers in `api/generated` belong to the backend generator once availa
 `pnpm build` prerenders the landing in English and Spanish from the same React components
 and build-time locale fallback. Runtime catalogue updates come from the locale API. Set
 `VITE_PUBLIC_URL` for canonical links and `VITE_API_URL` for a native or separate-origin API.
+
+Profile asks for name and language. `FileField` is reusable in product forms; the kit profile
+has no avatar. Sensitive writes open the sudo dialog when needed, then retry the original
+change. Jobs appears in the admin footer only when bootstrap enables it; the API supplies
+its temporary dashboard URL. Checkout returns poll until the paid subscription arrives
+(every three seconds, at most one minute).
+
+Browser journeys in `frontend/e2e/` verify forms, navigation, confirmations and language
+changes against the real API. Vitest covers pure functions; UI behavior belongs in Playwright.
