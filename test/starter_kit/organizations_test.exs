@@ -7,13 +7,6 @@ defmodule StarterKit.OrganizationsTest do
   alias StarterKit.Organizations
   alias StarterKit.Organizations.{Invitation, Membership}
 
-  test "a new user gets a personal organization as owner" do
-    scope = scope_fixture()
-    assert scope.organization.personal
-    assert scope.membership.role == :owner
-    assert Scope.full_access?(scope)
-  end
-
   describe "invitations" do
     setup do
       %{scope: scope_fixture()}
@@ -38,7 +31,7 @@ defmodule StarterKit.OrganizationsTest do
       assert {:ok, %Membership{role: :admin}} =
                Organizations.accept_invitation(invitee_scope, token)
 
-      assert {:error, :invalid_invitation} = Organizations.accept_invitation(invitee_scope, token)
+      assert {:error, :invitation_invalid} = Organizations.accept_invitation(invitee_scope, token)
     end
 
     test "must match the invited email", %{scope: scope} do
@@ -47,7 +40,7 @@ defmodule StarterKit.OrganizationsTest do
           &Organizations.create_invitation(scope, %{"email" => "someone@example.com"}, &1)
         )
 
-      assert {:error, :email_mismatch} =
+      assert {:error, {:email_mismatch, "someone@example.com"}} =
                Organizations.accept_invitation(Scope.for_user(user_fixture()), token)
     end
 
@@ -75,7 +68,7 @@ defmodule StarterKit.OrganizationsTest do
         skip_org_id: true
       )
 
-      assert {:error, :invalid_invitation} = Organizations.get_open_invitation(token)
+      assert {:error, :invitation_invalid} = Organizations.get_open_invitation(token)
     end
   end
 

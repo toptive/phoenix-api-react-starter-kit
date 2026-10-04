@@ -40,6 +40,13 @@ defmodule StarterKit.I18n do
   @doc "The runtime catalogue for `locale` (flat map, sent once per full page load)."
   def catalog(locale), do: Catalog.get(locale)
 
+  @doc "A supported locale catalogue and the version used for its conditional GET."
+  def locale_catalog(locale) do
+    if locale in locales(),
+      do: {:ok, %{catalog: catalog(locale), version: version()}},
+      else: {:error, :not_found}
+  end
+
   @doc "Catalogue version (changes on every edit or sync)."
   def version, do: Catalog.version()
 
@@ -93,6 +100,7 @@ defmodule StarterKit.I18n do
   defp error_key(opts) do
     case {opts[:validation], opts[:constraint]} do
       {kind, _} when kind in [:length, :number] -> "validation.#{kind}_#{opts[:kind]}"
+      {:unsafe_unique, _} -> "validation.unique"
       {nil, nil} -> nil
       {nil, constraint} -> "validation.#{constraint}"
       {validation, _} -> "validation.#{validation}"
@@ -115,6 +123,29 @@ defmodule StarterKit.I18n do
         do: message,
         else: error_key(opts) || "validation.invalid"
     end)
+  end
+
+  @doc "Translated API field errors, with bindings only for placeholders in the CSV key."
+  def validation_details(changeset, locale) do
+    Ecto.Changeset.traverse_errors(changeset, fn {message, opts} ->
+      key =
+        cond do
+          String.starts_with?(message, "validation.") -> message
+          opts[:validation] == :cast -> "validation.inclusion"
+          true -> error_key(opts) || "validation.invalid"
+        end
+
+      field_error(key, Map.new(opts), locale)
+    end)
+  end
+
+  @doc "An API field error translated from the catalogue."
+  def field_error(key, bindings, locale) do
+    placeholders = Regex.scan(~r/\{\{\s*(\w+)\s*\}\}/, t(key, %{}, locale))
+    bindings = Map.new(bindings, fn {name, value} -> {to_string(name), format_binding(value)} end)
+    bindings = Map.take(bindings, Enum.map(placeholders, &Enum.at(&1, 1)))
+    error = %{key: key, message: t(key, bindings, locale)}
+    if map_size(bindings) == 0, do: error, else: Map.put(error, :bindings, bindings)
   end
 
   @doc "All changeset errors as `%{field => first message}` (Inertia form errors)."

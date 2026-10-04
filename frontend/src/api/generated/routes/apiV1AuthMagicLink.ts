@@ -8,4 +8,12 @@ export const apiV1AuthMagicLink = {
     url: buildUrl("/api/v1/auth/magic-links", {}, options),
     method: "post",
   }),
+  /** GET /api/v1/auth/magic-links/:token */
+  show: (
+    params: { token: string | number } | string | number,
+    options?: RouteOptions,
+  ): RouteDefinition<"get"> => ({
+    url: buildUrl("/api/v1/auth/magic-links/:token", params, options),
+    method: "get",
+  }),
 } as const;

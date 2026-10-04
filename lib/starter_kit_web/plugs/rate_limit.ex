@@ -31,7 +31,9 @@ defmodule StarterKitWeb.Plugs.RateLimit do
         conn = put_resp_header(conn, "retry-after", to_string(div(retry_after, 1000) + 1))
 
         if opts[:format] == :json or json?(conn) do
-          conn |> Responses.render_error(429, :rate_limited) |> halt()
+          conn
+          |> Responses.render_error(429, :rate_limited, %{retry_after: div(retry_after, 1000) + 1})
+          |> halt()
         else
           conn
           |> Responses.put_flash_t(:error, "errors.api.too_many_requests")

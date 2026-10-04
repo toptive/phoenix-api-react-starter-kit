@@ -1,6 +1,6 @@
 # StarterKit — rulebook
 
-Phoenix 1.8 + Inertia + React 19 + shadcn, server-rendered public pages, one Postgres, Oban.
+Phoenix 1.8 JSON API + React 19 SPA + shadcn, one Postgres, Oban.
 This repository is the **Toptive base template**: every product starts as a copy of it
 (`bin/rename`, then [docs/NEW_PRODUCT.md](docs/NEW_PRODUCT.md)).
 
@@ -58,17 +58,14 @@ credo/, test/architecture/  our rules, executable
 - **REST actions only**: `index show new create edit update delete`. Any other verb is a nested
   resource controller: `POST /admin/users/:user_id/impersonation`, not `impersonate`.
   URLs are resource trees, never verbs. (`credo` check `StarterKit.Credo.RestActions`.)
-- **Skinny**: authorize → cast params → ONE context call → render (Inertia props through
-  serializers for unconverted areas; API data uses `render_data/3`, `render_collection/4`
-  or `render_error/4` under `/api/v1`).
+- **Skinny**: authorize → cast params → ONE context call → render through serializers and
+  `render_data/3`, `render_collection/4` or `render_error/4` under `/api/v1`.
 - **Authorization**: every action calls `authorize!(conn, action, resource)` or
   `skip_authorization(conn)` (public pages). `VerifyAuthorized` fails the request otherwise and
   `test/architecture` fails the build. Policies: one module per schema, deny by default.
 - Controllers never touch `Repo`, `Ecto.Query` or changesets (`boundary` + architecture test).
-- Converted controllers live under `controllers/api/v1`, use opaque bearer tokens, and answer
-  JSON envelopes. Changeset failures are 422 `validation_failed` with field → message-key lists.
-- Unconverted areas keep their Inertia rendering, `page/2` declarations and 303 form redirects
-  until that area is converted. Do not add Inertia declarations to API controllers.
+- API controllers live under `controllers/api/v1`, use opaque bearer sessions, and answer JSON
+  envelopes. Validation details are field → `{key, message, bindings?}` lists. No Inertia declarations.
 
 ### Contexts (STRICT)
 
@@ -98,14 +95,13 @@ Serializers (`lib/starter_kit_web/serializers`) and the router → `mix typelize
 `frontend/src/api/generated/{serializers,routes}`. Generated files are committed;
 `mix typelizer.check` fails on drift (pre-commit, pre-push, `/deploy`).
 Use generated serializer types and route helpers in the SPA; never mirror a server type or
-hard-code a path. The pages generator is disabled. Unconverted Inertia controllers retain
-runtime prop validation until their conversion. Details: [docs/TYPE_CONTRACT.md](docs/TYPE_CONTRACT.md).
+hard-code a path. The pages generator is disabled. Details: [docs/TYPE_CONTRACT.md](docs/TYPE_CONTRACT.md).
 
 ## Frontend
 
-- React 19, TypeScript strict, Vite, Tailwind v4. Data comes ONLY as Inertia props and visits:
-  no `fetch`/`axios` for data (the one exception is `lib/uploads.ts`), no `useEffect` for data.
-- Forms use Inertia's `useForm` — never react-hook-form. Wrap params with `form.transform`.
+- React 19, TypeScript strict, Vite, Tailwind v4. SPA data uses React Query through the API
+  client and generated contract. No raw fetch in pages or useEffect for data.
+- Forms use the shared mutation pattern; never react-hook-form.
 - **We own the components.** All shadcn primitives live in `components/ui`; change a look
   app-wide by editing the component. Repeated patterns become `components/app/*`
   (never copy-paste between pages).
@@ -127,7 +123,7 @@ runtime prop validation until their conversion. Details: [docs/TYPE_CONTRACT.md]
 ## Security
 
 - Policies + tenant guard on every endpoint; superadmin area returns 404 to everyone else.
-- Session auth (magic link, password ≥ 12, Google), sudo mode for email/password/account
+- Bearer sessions (magic link, password ≥ 12, Google), sudo mode for email/password/account
   changes, rate limits, CSP with nonces, HSTS in production, append-only audit log.
 - Uploads only through `StarterKit.Uploads` (allow-lists, size caps, byte sniffing, no SVG).
 - Sentry off without a DSN; no request bodies, cookies or PII except the user id.
@@ -144,8 +140,10 @@ runtime prop validation until their conversion. Details: [docs/TYPE_CONTRACT.md]
 - **There is no CI.** Four layers: `.claude/hooks/architecture-check` (after each Claude edit),
   `.githooks/pre-commit` (staged files), `.githooks/pre-push` (`mix check`), `/deploy` (again).
   `mix setup` installs the hooks. Details: [docs/GATES.md](docs/GATES.md).
-- Every context function has a test; every page renders in a controller test (typelizer validates
-  its props); every tenant schema has an isolation test.
+- Test behavior through HTTP API requests: success, validation, unauthorized, forbidden and tenant
+  isolation outcomes, plus end-to-end flows. Context tests cover real branching only; no tests of
+  private helpers, standalone serializers or trivial getters. Every tenant schema has an isolation test.
+- SPA flows use Playwright against the real backend; Vitest covers pure functions only.
 
 ## Deploy
 

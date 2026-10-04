@@ -13,6 +13,9 @@ defmodule StarterKit.Organizations.MembershipPolicy do
   @impl true
   def authorize(%Scope{} = scope, :index, Membership), do: not is_nil(scope.membership)
 
+  def authorize(%Scope{} = scope, :update, Membership), do: OrganizationPolicy.manager?(scope)
+  def authorize(%Scope{} = scope, :delete, Membership), do: not is_nil(scope.membership)
+
   def authorize(%Scope{user: %{id: user_id}} = scope, :delete, %Membership{user_id: user_id} = m),
     do: same_org?(scope, m)
 

@@ -16,7 +16,12 @@ defmodule StarterKitWeb.Api.V1.Auth.RegistrationController do
          ) do
       {:ok, user} ->
         Analytics.track("user_registered", user, %{via: "email"})
-        conn |> put_status(201) |> render_data(nil, %{message: "flash.magic_link_sent"})
+
+        conn
+        |> put_status(202)
+        |> render_data(
+          {Serializers.MagicLinkRequestSerializer, %{email: user.email, new_account: true}}
+        )
 
       {:error, reason} ->
         ApiAuth.error(conn, reason)

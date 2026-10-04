@@ -1,11 +1,6 @@
 defmodule StarterKitWeb.AppTest do
   use StarterKitWeb.ConnCase, async: true
 
-  import Swoosh.TestAssertions
-
-  alias StarterKit.Organizations
-  alias StarterKit.Organizations.Organization
-
   setup :register_and_log_in_user
 
   test "dashboard and shared auth props", %{conn: conn, user: user, scope: scope} do
@@ -23,8 +18,6 @@ defmodule StarterKitWeb.AppTest do
           {~p"/settings/profile/edit", "settings/profile/edit"},
           {~p"/settings/appearance/edit", "settings/appearance/edit"},
           {~p"/settings/sessions", "settings/sessions/index"},
-          {~p"/settings/organization/edit", "settings/organization/edit"},
-          {~p"/settings/members", "settings/members/index"},
           {~p"/settings/email/edit", "settings/email/edit"},
           {~p"/settings/password/edit", "settings/password/edit"},
           {~p"/settings/account/edit", "settings/account/edit"}
@@ -37,72 +30,6 @@ defmodule StarterKitWeb.AppTest do
     conn = patch(conn, ~p"/settings/profile", %{"user" => %{"name" => "Ana", "locale" => "es"}})
     assert redirected_to(conn) == ~p"/settings/profile/edit"
     assert conn |> recycle() |> get(~p"/dashboard") |> inertia_props() |> Map.get(:locale) == "es"
-  end
-
-  test "inviting someone and listing them as pending", %{conn: conn} do
-    conn =
-      post(conn, ~p"/settings/invitations", %{
-        "invitation" => %{"email" => "new@example.com", "role" => "member", "access" => "viewer"}
-      })
-
-    assert redirected_to(conn) == ~p"/settings/members"
-    assert_email_sent(subject: "Test User invited you to Test User")
-
-    [invitation] =
-      conn |> recycle() |> get(~p"/settings/members") |> inertia_props() |> Map.get(:invitations)
-
-    assert invitation["email"] == "new@example.com"
-    assert invitation["access"] == "viewer"
-  end
-
-  test "a viewer member cannot invite or manage people", %{conn: conn, scope: scope} do
-    viewer = user_fixture()
-    membership_fixture(scope, viewer, :member, :viewer)
-    conn = conn |> log_in_user(viewer) |> put_session(:organization_id, scope.organization.id)
-
-    props = conn |> get(~p"/settings/members") |> inertia_props()
-    refute props.canManage
-    assert props.invitations == []
-
-    conn = post(conn, ~p"/settings/invitations", %{"invitation" => %{"email" => "x@example.com"}})
-    assert inertia_component(conn) == "errors/show"
-    assert conn.status == 403
-  end
-
-  test "switching organization", %{conn: conn, user: user} do
-    other = scope_fixture()
-    membership_fixture(other, user)
-
-    conn = patch(conn, ~p"/current-organization", %{"organizationId" => other.organization.id})
-    assert redirected_to(conn) == ~p"/dashboard"
-    props = conn |> recycle() |> get(~p"/dashboard") |> inertia_props()
-    assert props.auth.organization["id"] == other.organization.id
-  end
-
-  test "cannot switch into a foreign organization", %{conn: conn} do
-    other = scope_fixture()
-    conn = patch(conn, ~p"/current-organization", %{"organizationId" => other.organization.id})
-    assert conn.status == 403
-  end
-
-  test "creating another organization", %{conn: conn} do
-    conn = post(conn, ~p"/organizations", %{"organization" => %{"name" => "Acme"}})
-    assert redirected_to(conn) == ~p"/dashboard"
-    props = conn |> recycle() |> get(~p"/dashboard") |> inertia_props()
-    assert props.auth.organization["name"] == "Acme"
-    assert length(props.auth.organizations) == 2
-  end
-
-  test "accepting an invitation from its page", %{conn: conn, user: user} do
-    other = scope_fixture()
-    token = capture_token(&Organizations.create_invitation(other, %{"email" => user.email}, &1))
-
-    page = get(conn, ~p"/invitations/#{token}")
-    assert inertia_props(page).emailMatches
-
-    conn = post(conn, ~p"/invitations/#{token}/acceptance")
-    assert redirected_to(conn) == ~p"/dashboard"
-    assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Welcome"
   end
 
   test "sensitive settings need a recent sign-in", %{conn: conn, user: user} do
@@ -140,25 +67,5 @@ defmodule StarterKitWeb.AppTest do
     assert redirected_to(conn) == ~p"/settings/account/edit"
     assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "owner"
     assert StarterKit.Repo.get(StarterKit.Accounts.User, user.id)
-  end
-
-  test "a new organization's owner goes through onboarding once", %{conn: conn, scope: scope} do
-    scope.organization |> Ecto.Changeset.change(onboarded_at: nil) |> StarterKit.Repo.update!()
-
-    assert conn |> get(~p"/dashboard") |> redirected_to() == ~p"/onboarding/edit"
-
-    page = get(conn, ~p"/onboarding/edit")
-    assert inertia_component(page) == "onboarding/edit"
-    assert inertia_props(page).organizationName == scope.organization.name
-
-    done = patch(conn, ~p"/onboarding", %{"onboarding" => %{"name" => "Acme"}})
-    assert redirected_to(done) == ~p"/dashboard"
-
-    assert_received {:analytics,
-                     %{event: "onboarding_completed", properties: %{"skipped" => false}}}
-
-    assert conn |> get(~p"/dashboard") |> inertia_component() == "dashboard/show"
-    assert conn |> get(~p"/onboarding/edit") |> redirected_to() == ~p"/dashboard"
-    assert StarterKit.Repo.get!(Organization, scope.organization.id).name == "Acme"
   end
 end

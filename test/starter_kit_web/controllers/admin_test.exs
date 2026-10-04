@@ -70,7 +70,7 @@ defmodule StarterKitWeb.AdminTest do
       assert {:ok, %{title: "Privacy"}} = StarterKit.Legal.published_page("privacy", "en")
     end
 
-    test "impersonating a user and coming back", %{conn: conn, user: admin} do
+    test "starting an impersonation", %{conn: conn, user: admin} do
       target = user_fixture()
       scope_fixture(target)
 
@@ -85,15 +85,6 @@ defmodule StarterKitWeb.AdminTest do
       assert props.auth.user["id"] == target.id
       assert props.auth.impersonator["id"] == admin.id
       refute props.auth.superadmin
-
-      conn = conn |> recycle() |> delete(~p"/impersonation")
-      assert redirected_to(conn) == ~p"/admin/users"
-
-      assert conn
-             |> recycle()
-             |> get(~p"/dashboard")
-             |> inertia_props()
-             |> get_in([:auth, :user, "id"]) == admin.id
     end
   end
 end

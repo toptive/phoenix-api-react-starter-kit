@@ -1,30 +1,31 @@
 defmodule StarterKitWeb.Api.V1.Auth.GoogleCallbackController do
-  @moduledoc "Google callback: validates state, issues a bearer token and returns to the SPA."
+  @moduledoc "Verifies Google state, signs in and hands the session to web or native."
   use StarterKitWeb, :controller
   alias StarterKit.Organizations
   alias StarterKitWeb.ApiAuth
-  plug StarterKitWeb.Plugs.RateLimit, bucket: "api_google_callback", limit: 10, period: 60_000
+  plug StarterKitWeb.Plugs.RateLimit, bucket: "api_google_callback", limit: 20, period: 60_000
 
-  def create(conn, %{"code" => code, "state" => state}) do
+  def create(conn, params) do
     conn = skip_authorization(conn)
 
-    with true <- is_binary(code),
-         true <- Application.get_env(:starter_kit, :google_auth, false),
-         {:ok, locale} <- ApiAuth.google_state(conn, state) do
-      ApiAuth.google_result(
-        conn,
-        Organizations.create_google_api_session(
-          code,
-          ApiAuth.google_callback_url(),
-          locale,
-          ApiAuth.device(conn)
-        )
-      )
+    if Application.get_env(:starter_kit, :google_auth, false) do
+      case ApiAuth.google_state(params["state"]) do
+        {:ok, state} ->
+          result =
+            Organizations.create_google_api_session(
+              params["code"],
+              ApiAuth.google_callback_url(),
+              state.locale,
+              ApiAuth.device(conn)
+            )
+
+          ApiAuth.google_result(conn, result, state)
+
+        {:error, reason} ->
+          ApiAuth.google_result(conn, {:error, reason})
+      end
     else
-      _ -> ApiAuth.google_result(conn, {:error, :oauth_failed})
+      render_error(conn, 404, :not_found)
     end
   end
-
-  def create(conn, _params),
-    do: conn |> skip_authorization() |> ApiAuth.google_result({:error, :oauth_failed})
 end

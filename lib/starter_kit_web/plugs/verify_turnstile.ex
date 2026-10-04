@@ -44,8 +44,14 @@ defmodule StarterKitWeb.Plugs.VerifyTurnstile do
 
         if String.starts_with?(conn.request_path, "/api/") do
           conn
-          |> StarterKitWeb.Responses.render_error(422, :validation_failed, %{
-            turnstile_token: ["validation.turnstile_required"]
+          |> StarterKitWeb.Responses.render_error(422, :turnstile_failed, %{
+            turnstile_token: [
+              StarterKit.I18n.field_error(
+                "validation.turnstile_required",
+                %{},
+                StarterKitWeb.Responses.locale(conn)
+              )
+            ]
           })
           |> halt()
         else

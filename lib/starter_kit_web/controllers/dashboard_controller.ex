@@ -15,7 +15,7 @@ defmodule StarterKitWeb.DashboardController do
     conn = authorize!(conn, :show, scope(conn).organization || Organization)
 
     if Organizations.onboarding_required?(scope(conn)) do
-      redirect(conn, to: ~p"/onboarding/edit")
+      redirect(conn, external: StarterKitWeb.ApiAuth.spa_url("/onboarding/edit"))
     else
       render_inertia(conn, "dashboard/show")
     end

@@ -10,6 +10,8 @@ defmodule StarterKitWeb.ErrorJSON do
       Map.get(
         %{
           "400" => "bad_request",
+          "405" => "bad_request",
+          "415" => "bad_request",
           "403" => "forbidden",
           "404" => "not_found",
           "401" => "unauthorized",

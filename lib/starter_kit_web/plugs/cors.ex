@@ -16,7 +16,7 @@ defmodule StarterKitWeb.Plugs.Cors do
         if origin in origins do
           conn
           |> put_resp_header("access-control-allow-origin", origin)
-          |> put_resp_header("access-control-expose-headers", "ETag, X-Request-Id, Retry-After")
+          |> put_resp_header("access-control-expose-headers", "ETag, Retry-After")
           |> preflight()
         else
           conn
@@ -31,10 +31,10 @@ defmodule StarterKitWeb.Plugs.Cors do
 
   defp preflight(%{method: "OPTIONS"} = conn) do
     conn
-    |> put_resp_header("access-control-allow-methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+    |> put_resp_header("access-control-allow-methods", "GET, POST, PUT, DELETE, OPTIONS")
     |> put_resp_header(
       "access-control-allow-headers",
-      "Authorization, Content-Type, Accept, Accept-Language, If-None-Match"
+      "Authorization, Content-Type, Accept-Language, If-None-Match"
     )
     |> put_resp_header("access-control-max-age", "600")
     |> send_resp(204, "")

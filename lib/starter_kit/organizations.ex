@@ -18,7 +18,10 @@ defmodule StarterKit.Organizations do
       StarterKit.Policy,
       StarterKit.Accounts,
       StarterKit.Audit,
-      StarterKit.Notifications
+      StarterKit.Notifications,
+      StarterKit.I18n,
+      StarterKit.Flags,
+      StarterKit.AbuseProtection
     ],
     exports: [
       Organization,
@@ -33,7 +36,15 @@ defmodule StarterKit.Organizations do
 
   alias StarterKit.{Accounts, Audit, Notifications, Repo}
   alias StarterKit.Accounts.{Scope, User}
-  alias StarterKit.Organizations.{Invitation, Membership, Organization, OrganizationPolicy}
+
+  alias StarterKit.Organizations.{
+    Invitation,
+    InvitationPolicy,
+    Membership,
+    MembershipPolicy,
+    Organization,
+    OrganizationPolicy
+  }
 
   @doc "`:multi` or `:single`."
   def mode, do: Application.get_env(:starter_kit, :tenancy, :multi)
@@ -87,6 +98,7 @@ defmodule StarterKit.Organizations do
   defp create_personal_organization(user) do
     name = if user.name in [nil, ""], do: user.email, else: user.name
 
+    name = String.slice(if(String.length(name) < 2, do: user.email, else: name), 0, 80)
     create_organization(user, %{name: name}, personal: true)
   end
 
@@ -186,10 +198,8 @@ defmodule StarterKit.Organizations do
 
   @doc "Renames the organization (audited)."
   def update_organization(%Scope{} = scope, %Organization{} = org, attrs) do
-    with {:ok, updated} <- org |> Organization.changeset(attrs) |> Repo.update() do
-      Audit.record("organization.updated", scope: scope, subject: updated)
-      {:ok, updated}
-    end
+    changeset = Organization.changeset(org, attrs)
+    Repo.transact(fn -> save_organization(scope, changeset, "organization.updated") end)
   end
 
   @doc "Number of organizations (admin dashboard)."
@@ -219,7 +229,7 @@ defmodule StarterKit.Organizations do
     Repo.all(
       from(m in Membership,
         join: u in assoc(m, :user),
-        order_by: [asc: u.name, asc: u.email],
+        order_by: [asc: m.inserted_at, asc: m.id],
         preload: [user: u]
       ),
       org_id: Scope.organization_id(scope)
@@ -248,10 +258,15 @@ defmodule StarterKit.Organizations do
   end
 
   defp change_membership(scope, membership, attrs) do
+    scope = refresh_membership(scope)
     changeset = Membership.changeset(membership, attrs)
 
     cond do
-      Ecto.Changeset.get_field(changeset, :role) == :owner and not Scope.role_in?(scope, [:owner]) ->
+      not OrganizationPolicy.manager?(scope) ->
+        {:error, :forbidden}
+
+      (membership.role == :owner or Ecto.Changeset.get_field(changeset, :role) == :owner) and
+          not Scope.role_in?(scope, [:owner]) ->
         {:error, Ecto.Changeset.add_error(changeset, :role, "validation.owner_only")}
 
       membership.role == :owner and Ecto.Changeset.get_field(changeset, :role) != :owner and
@@ -271,7 +286,7 @@ defmodule StarterKit.Organizations do
         metadata: %{role: updated.role, access: updated.access}
       )
 
-      {:ok, updated}
+      {:ok, Repo.preload(updated, :user)}
     end
   end
 
@@ -281,19 +296,32 @@ defmodule StarterKit.Organizations do
   end
 
   defp remove_membership(scope, membership) do
-    if membership.role == :owner and last_owner?(membership) do
-      {:error, :last_owner}
-    else
-      with {:ok, deleted} <- Repo.delete(membership) do
-        Audit.record("membership.deleted",
-          scope: scope,
-          subject: deleted,
-          metadata: %{user_id: deleted.user_id}
-        )
+    scope = refresh_membership(scope)
 
-        {:ok, deleted}
-      end
+    cond do
+      not MembershipPolicy.authorize(scope, :delete, membership) -> {:error, :forbidden}
+      membership.role == :owner and last_owner?(membership) -> {:error, :last_owner}
+      true -> delete_audited_membership(scope, membership)
     end
+  end
+
+  defp delete_audited_membership(scope, membership) do
+    with {:ok, deleted} <- Repo.delete(membership) do
+      Audit.record("membership.deleted",
+        scope: scope,
+        subject: deleted,
+        metadata: %{user_id: deleted.user_id}
+      )
+
+      {:ok, deleted}
+    end
+  end
+
+  defp refresh_membership(scope) do
+    membership =
+      Repo.get_by(Membership, [user_id: scope.user.id], org_id: Scope.organization_id(scope))
+
+    %{scope | membership: membership}
   end
 
   @doc """
@@ -330,8 +358,13 @@ defmodule StarterKit.Organizations do
   a skipped step sends a blank value and keeps what is there.
   """
   def complete_onboarding(%Scope{organization: %Organization{} = org} = scope, attrs) do
-    with {:ok, updated} <- org |> Organization.onboarding_changeset(attrs) |> Repo.update() do
-      Audit.record("organization.onboarded", scope: scope, subject: updated)
+    changeset = Organization.onboarding_changeset(org, attrs)
+    Repo.transact(fn -> save_organization(scope, changeset, "organization.onboarded") end)
+  end
+
+  defp save_organization(scope, changeset, action) do
+    with {:ok, updated} <- Repo.update(changeset),
+         {:ok, _event} <- Audit.record(action, scope: scope, subject: updated) do
       {:ok, updated}
     end
   end
@@ -344,7 +377,10 @@ defmodule StarterKit.Organizations do
   @doc "Pending invitations of the current organization."
   def list_invitations(%Scope{} = scope) do
     Repo.all(
-      from(i in Invitation, where: is_nil(i.accepted_at), order_by: [desc: i.inserted_at]),
+      from(i in Invitation,
+        where: is_nil(i.accepted_at) and i.expires_at > ^now(),
+        order_by: [desc: i.inserted_at]
+      ),
       org_id: Scope.organization_id(scope)
     )
   end
@@ -359,7 +395,7 @@ defmodule StarterKit.Organizations do
   `url_fun` receives the raw token. `{:error, :email_unavailable}` (nothing written)
   when no mail can be sent.
   """
-  def create_invitation(%Scope{} = scope, attrs, url_fun) do
+  def create_invitation(%Scope{} = scope, attrs, url_fun, locale \\ nil) do
     org = scope.organization
 
     changeset =
@@ -370,13 +406,42 @@ defmodule StarterKit.Organizations do
     {token, changeset} = Invitation.put_token(changeset)
 
     with :ok <- if(Notifications.email_available?(), do: :ok, else: {:error, :email_unavailable}),
-         {:ok, invitation} <- Repo.insert(changeset) do
+         {:ok, invitation} <- Repo.transact(fn -> insert_invitation(scope, changeset) end) do
       Notifications.notify(
-        %{email: invitation.email, name: "", locale: scope.user.locale},
+        %{email: invitation.email, name: "", locale: locale || scope.user.locale},
         :invitation,
         %{url: url_fun.(token), organization: org.name, inviter: scope.user.name}
       )
 
+      {:ok, invitation}
+    end
+  end
+
+  @doc "Seats already occupied or reserved by pending invitations."
+  def invitation_seat_count(scope) do
+    org_id = Scope.organization_id(scope)
+
+    Repo.aggregate(Membership, :count, org_id: org_id) +
+      Repo.aggregate(
+        from(i in Invitation, where: is_nil(i.accepted_at) and i.expires_at > ^now()),
+        :count,
+        org_id: org_id
+      )
+  end
+
+  defp insert_invitation(scope, changeset) do
+    org_id = Scope.organization_id(scope)
+
+    Repo.delete_all(
+      from(i in Invitation,
+        where:
+          i.email == ^Ecto.Changeset.get_field(changeset, :email) and is_nil(i.accepted_at) and
+            i.expires_at <= ^now()
+      ),
+      org_id: org_id
+    )
+
+    with {:ok, invitation} <- Repo.insert(changeset) do
       Audit.record("invitation.created",
         scope: scope,
         subject: invitation,
@@ -424,11 +489,82 @@ defmodule StarterKit.Organizations do
     Accounts.register_user(attrs, url_fun, Keyword.put(opts, :invited, invited))
   end
 
+  @doc "The public bootstrap and optional authenticated scope."
+  def bootstrap(scope, locale) do
+    %{
+      auth: auth(scope),
+      locale: locale,
+      locales: StarterKit.I18n.locales(),
+      i18n_version: StarterKit.I18n.version(),
+      flags: StarterKit.Flags.public(),
+      turnstile: StarterKit.AbuseProtection.widget(),
+      app: %{
+        name: Application.fetch_env!(:starter_kit, :app_name),
+        tenancy: mode(),
+        signup_mode: Accounts.signup_mode(),
+        google_enabled: Application.get_env(:starter_kit, :google_auth, false),
+        email_available: Accounts.email_sign_in_available?(),
+        public_url: Application.fetch_env!(:starter_kit, :spa_origin)
+      }
+    }
+  end
+
+  @doc "The authenticated part of bootstrap."
+  def auth(nil), do: nil
+
+  def auth(scope) do
+    %{
+      user: scope.user,
+      organization: scope.organization,
+      membership: %{scope.membership | user: nil},
+      organizations: list_user_organizations(scope),
+      superadmin: Scope.superadmin?(scope),
+      impersonator: scope.impersonator,
+      onboarding_required: onboarding_required?(scope),
+      sudo_until: scope.session.sudo_until,
+      session_id: scope.session.id
+    }
+  end
+
+  @doc "Password sign-in with a device-local organization."
+  def create_password_session(attrs, device, current) do
+    Repo.transact(fn ->
+      with {:ok, session} <- Accounts.create_api_session(attrs, device, current),
+           do: initialize_session(session)
+    end)
+  end
+
+  @doc "Magic-link sign-in with a device-local organization."
+  def create_link_session(token, device, current) do
+    Repo.transact(fn ->
+      with {:ok, session} <- Accounts.create_magic_link_session(token, device, current),
+           do: initialize_session(session)
+    end)
+  end
+
+  defp initialize_session(payload) do
+    current = payload.user |> Scope.for_user() |> scope_for(payload.session.organization_id)
+
+    with {:ok, _} <- Accounts.set_session_organization(payload.session, current.organization.id) do
+      {:ok, payload}
+    end
+  end
+
   @doc "Exchanges the provider code, applies signup policy and issues an API session."
   def create_google_api_session(code, redirect_uri, locale, device) do
-    with {:ok, info} <- Accounts.google_identity(code, redirect_uri, locale),
-         {:ok, user} <- upsert_google_user(info) do
-      {:ok, Accounts.generate_api_token(user, device)}
+    with true <- is_binary(code) || {:error, :oauth_failed},
+         {:ok, info} <- Accounts.google_identity(code, redirect_uri, locale) do
+      Repo.transact(fn -> persist_google_session(info, device) end)
+    end
+  end
+
+  defp persist_google_session(info, device) do
+    new_account = not Accounts.google_account_exists?(info)
+
+    with {:ok, user} <- upsert_google_user(info) do
+      initialize_session(
+        Map.put(Accounts.generate_api_token(user, device), :new_account, new_account)
+      )
     end
   end
 
@@ -461,7 +597,7 @@ defmodule StarterKit.Organizations do
          true <- Invitation.open?(invitation) do
       {:ok, invitation}
     else
-      _ -> {:error, :invalid_invitation}
+      _ -> {:error, :invitation_invalid}
     end
   end
 
@@ -470,26 +606,145 @@ defmodule StarterKit.Organizations do
   invited email. Returns `{:ok, membership}`.
   """
   def accept_invitation(%Scope{user: user} = scope, token) do
-    with {:ok, invitation} <- get_open_invitation(token),
-         true <-
-           String.downcase(user.email) == String.downcase(invitation.email) ||
-             {:error, :email_mismatch} do
-      Repo.transact(fn -> join(scope, invitation) end)
-    end
+    Repo.transact(fn ->
+      with {:ok, invitation} <- get_open_invitation(token),
+           invitation <-
+             Repo.get!(Invitation, invitation.id,
+               org_id: invitation.organization_id,
+               lock: "FOR UPDATE"
+             ),
+           true <- Invitation.open?(invitation) || {:error, :invitation_invalid},
+           true <-
+             String.downcase(user.email) == String.downcase(invitation.email) ||
+               {:error, {:email_mismatch, invitation.email}} do
+        join(scope, invitation)
+      end
+    end)
   end
 
   defp join(%Scope{user: user} = scope, invitation) do
     with {:ok, _} <- invitation |> Ecto.Changeset.change(accepted_at: now()) |> Repo.update(),
-         {:ok, membership} <- Repo.insert(membership_from(invitation, user), on_conflict: :nothing) do
-      {:ok, _} = Accounts.remember_organization(user, invitation.organization_id)
-
+         {:ok, _} <- Repo.insert(membership_from(invitation, user), on_conflict: :nothing),
+         {:ok, user} <- Accounts.remember_organization(user, invitation.organization_id),
+         :ok <- update_device_org(scope, invitation.organization_id) do
       Audit.record("invitation.accepted",
         scope: scope,
         subject: invitation,
         organization_id: invitation.organization_id
       )
 
-      {:ok, membership}
+      membership = Repo.get_by!(Membership, [user_id: user.id], org_id: invitation.organization_id)
+      {:ok, Repo.preload(membership, :user)}
+    end
+  end
+
+  defp update_device_org(%Scope{session: nil}, _org_id), do: :ok
+
+  defp update_device_org(scope, org_id) do
+    with {:ok, _} <- Accounts.set_session_organization(scope.session, org_id), do: :ok
+  end
+
+  @doc "Switches this device and returns the refreshed Auth payload."
+  def switch_current_organization(scope, organization_id) do
+    case Ecto.UUID.cast(organization_id) do
+      {:ok, _} -> Repo.transact(fn -> switch_device(scope, organization_id) end)
+      _ -> {:error, :not_member}
+    end
+  end
+
+  defp switch_device(scope, organization_id) do
+    with {:ok, current} <- switch_organization(scope, organization_id),
+         :ok <- update_device_org(scope, organization_id) do
+      {:ok, auth(current)}
+    end
+  end
+
+  @doc "Creates an onboarded organization and switches this device atomically."
+  def create_current_organization(scope, attrs) do
+    if mode() == :multi,
+      do: Repo.transact(fn -> create_device_organization(scope, attrs) end),
+      else: {:error, :forbidden}
+  end
+
+  defp create_device_organization(scope, attrs) do
+    with {:ok, org} <- create_user_organization(scope, attrs),
+         :ok <- update_device_org(scope, org.id) do
+      {:ok, org}
+    end
+  end
+
+  @doc "The current organization's onboarding questions and completion state."
+  def onboarding(scope),
+    do: %{
+      organization_name: scope.organization.name,
+      required: is_nil(scope.organization.onboarded_at)
+    }
+
+  @doc "Organization settings and whether this member can edit them."
+  def organization_settings(scope),
+    do: %{organization: scope.organization, can_edit: OrganizationPolicy.manager?(scope)}
+
+  @doc "Public invitation preview, optionally personalized by a bearer."
+  def invitation_preview(scope, token) do
+    with {:ok, invitation} <- get_open_invitation(token) do
+      {:ok,
+       %{
+         organization: invitation.organization.name,
+         email: invitation.email,
+         role: invitation.role,
+         access: invitation.access,
+         expires_at: invitation.expires_at,
+         email_matches:
+           not is_nil(scope) and
+             String.downcase(scope.user.email) == String.downcase(invitation.email)
+       }}
+    end
+  end
+
+  @doc "Changes a member through the scoped API, retaining owner-only validation."
+  def update_member(scope, id, attrs) do
+    with {:ok, membership} <- find_tenant_record(scope, Membership, id),
+         true <- OrganizationPolicy.manager?(scope) || {:error, :forbidden} do
+      update_membership(scope, membership, attrs)
+    end
+  end
+
+  @doc "Removes a member or leaves, resetting the leaving device's organization."
+  def remove_member(scope, id) do
+    Repo.transact(fn ->
+      with {:ok, membership} <- find_tenant_record(scope, Membership, id),
+           true <- MembershipPolicy.authorize(scope, :delete, membership) || {:error, :forbidden},
+           {:ok, deleted} <- delete_membership(scope, membership) do
+        reset_leaving_device(scope, membership)
+
+        {:ok, deleted}
+      end
+    end)
+  end
+
+  defp reset_leaving_device(scope, %{user_id: id}) when id == scope.user.id do
+    current = scope_for(scope)
+    {:ok, _} = Accounts.remember_organization(scope.user, current.organization.id)
+    update_device_org(scope, current.organization.id)
+  end
+
+  defp reset_leaving_device(_scope, _membership), do: :ok
+
+  @doc "Revokes an invitation from this tenant only."
+  def revoke_invitation(scope, id) do
+    with {:ok, invitation} <- find_tenant_record(scope, Invitation, id),
+         true <- InvitationPolicy.authorize(scope, :delete, invitation) || {:error, :forbidden} do
+      delete_invitation(scope, invitation)
+    end
+  end
+
+  defp find_tenant_record(scope, schema, id) do
+    with {:ok, _} <- Ecto.UUID.cast(id),
+         record when not is_nil(record) <-
+           Repo.get(schema, id, org_id: Scope.organization_id(scope)) do
+      {:ok, record}
+    else
+      _ -> {:error, :not_found}
     end
   end
 

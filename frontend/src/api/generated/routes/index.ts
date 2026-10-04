@@ -10,33 +10,34 @@ import { adminTranslation } from "./adminTranslation";
 import { adminTranslationFill } from "./adminTranslationFill";
 import { adminUser } from "./adminUser";
 import { adminUserImpersonation } from "./adminUserImpersonation";
-import { apiV1AuthConfirmation } from "./apiV1AuthConfirmation";
-import { apiV1AuthCurrentUser } from "./apiV1AuthCurrentUser";
 import { apiV1AuthGoogleCallback } from "./apiV1AuthGoogleCallback";
 import { apiV1AuthGoogleStart } from "./apiV1AuthGoogleStart";
+import { apiV1AuthImpersonation } from "./apiV1AuthImpersonation";
 import { apiV1AuthMagicLink } from "./apiV1AuthMagicLink";
 import { apiV1AuthMagicLinkSession } from "./apiV1AuthMagicLinkSession";
-import { apiV1AuthPasswordReset } from "./apiV1AuthPasswordReset";
 import { apiV1AuthRegistration } from "./apiV1AuthRegistration";
 import { apiV1AuthSession } from "./apiV1AuthSession";
 import { apiV1AuthSudo } from "./apiV1AuthSudo";
 import { apiV1Bootstrap } from "./apiV1Bootstrap";
+import { apiV1CurrentOrganization } from "./apiV1CurrentOrganization";
 import { apiV1DirectUpload } from "./apiV1DirectUpload";
+import { apiV1EmailOptOut } from "./apiV1EmailOptOut";
+import { apiV1EmailSubscription } from "./apiV1EmailSubscription";
 import { apiV1Event } from "./apiV1Event";
+import { apiV1Invitation } from "./apiV1Invitation";
+import { apiV1InvitationAcceptance } from "./apiV1InvitationAcceptance";
 import { apiV1Locale } from "./apiV1Locale";
-import { currentOrganization } from "./currentOrganization";
+import { apiV1Onboarding } from "./apiV1Onboarding";
+import { apiV1Organization } from "./apiV1Organization";
+import { apiV1SettingsInvitation } from "./apiV1SettingsInvitation";
+import { apiV1SettingsMembership } from "./apiV1SettingsMembership";
+import { apiV1SettingsOrganization } from "./apiV1SettingsOrganization";
 import { dashboard } from "./dashboard";
-import { emailOptOut } from "./emailOptOut";
 import { health } from "./health";
 import { home } from "./home";
-import { impersonation } from "./impersonation";
-import { invitation } from "./invitation";
-import { invitationInvitationAcceptance } from "./invitationInvitationAcceptance";
 import { legalPage } from "./legalPage";
 import { localizedHome } from "./localizedHome";
 import { localizedLegalPage } from "./localizedLegalPage";
-import { onboarding } from "./onboarding";
-import { organization } from "./organization";
 import { robots } from "./robots";
 import { settingsAccount } from "./settingsAccount";
 import { settingsAppearance } from "./settingsAppearance";
@@ -46,9 +47,6 @@ import { settingsBillingPortalSession } from "./settingsBillingPortalSession";
 import { settingsEmail } from "./settingsEmail";
 import { settingsEmailConfirmation } from "./settingsEmailConfirmation";
 import { settingsEmailPreference } from "./settingsEmailPreference";
-import { settingsInvitation } from "./settingsInvitation";
-import { settingsMembership } from "./settingsMembership";
-import { settingsOrganization } from "./settingsOrganization";
 import { settingsPassword } from "./settingsPassword";
 import { settingsProfile } from "./settingsProfile";
 import { settingsSession } from "./settingsSession";
@@ -67,33 +65,34 @@ export {
   adminTranslationFill,
   adminUser,
   adminUserImpersonation,
-  apiV1AuthConfirmation,
-  apiV1AuthCurrentUser,
   apiV1AuthGoogleCallback,
   apiV1AuthGoogleStart,
+  apiV1AuthImpersonation,
   apiV1AuthMagicLink,
   apiV1AuthMagicLinkSession,
-  apiV1AuthPasswordReset,
   apiV1AuthRegistration,
   apiV1AuthSession,
   apiV1AuthSudo,
   apiV1Bootstrap,
+  apiV1CurrentOrganization,
   apiV1DirectUpload,
+  apiV1EmailOptOut,
+  apiV1EmailSubscription,
   apiV1Event,
+  apiV1Invitation,
+  apiV1InvitationAcceptance,
   apiV1Locale,
-  currentOrganization,
+  apiV1Onboarding,
+  apiV1Organization,
+  apiV1SettingsInvitation,
+  apiV1SettingsMembership,
+  apiV1SettingsOrganization,
   dashboard,
-  emailOptOut,
   health,
   home,
-  impersonation,
-  invitation,
-  invitationInvitationAcceptance,
   legalPage,
   localizedHome,
   localizedLegalPage,
-  onboarding,
-  organization,
   robots,
   settingsAccount,
   settingsAppearance,
@@ -103,9 +102,6 @@ export {
   settingsEmail,
   settingsEmailConfirmation,
   settingsEmailPreference,
-  settingsInvitation,
-  settingsMembership,
-  settingsOrganization,
   settingsPassword,
   settingsProfile,
   settingsSession,
@@ -137,33 +133,34 @@ export const routes = {
   adminTranslationFill,
   adminUser,
   adminUserImpersonation,
-  apiV1AuthConfirmation,
-  apiV1AuthCurrentUser,
   apiV1AuthGoogleCallback,
   apiV1AuthGoogleStart,
+  apiV1AuthImpersonation,
   apiV1AuthMagicLink,
   apiV1AuthMagicLinkSession,
-  apiV1AuthPasswordReset,
   apiV1AuthRegistration,
   apiV1AuthSession,
   apiV1AuthSudo,
   apiV1Bootstrap,
+  apiV1CurrentOrganization,
   apiV1DirectUpload,
+  apiV1EmailOptOut,
+  apiV1EmailSubscription,
   apiV1Event,
+  apiV1Invitation,
+  apiV1InvitationAcceptance,
   apiV1Locale,
-  currentOrganization,
+  apiV1Onboarding,
+  apiV1Organization,
+  apiV1SettingsInvitation,
+  apiV1SettingsMembership,
+  apiV1SettingsOrganization,
   dashboard,
-  emailOptOut,
   health,
   home,
-  impersonation,
-  invitation,
-  invitationInvitationAcceptance,
   legalPage,
   localizedHome,
   localizedLegalPage,
-  onboarding,
-  organization,
   robots,
   settingsAccount,
   settingsAppearance,
@@ -173,9 +170,6 @@ export const routes = {
   settingsEmail,
   settingsEmailConfirmation,
   settingsEmailPreference,
-  settingsInvitation,
-  settingsMembership,
-  settingsOrganization,
   settingsPassword,
   settingsProfile,
   settingsSession,

@@ -1,51 +1,84 @@
 defmodule StarterKitWeb.EmailOptOutTest do
   use StarterKitWeb.ConnCase, async: true
+  import Ecto.Query
+  import StarterKitWeb.ApiHelpers
+  alias StarterKit.{Accounts, Notifications, Repo}
+  alias StarterKit.Audit.AuditEvent
 
-  alias StarterKit.{Notifications, Repo}
-
-  setup do
+  setup %{conn: conn} do
     user = user_fixture()
-    url = Notifications.unsubscribe_url(user.id, user.email)
-    %{user: user, path: URI.parse(url).path}
+    path = URI.parse(Notifications.unsubscribe_url(user.id, user.email)).path
+
+    %{
+      conn: api_conn(conn),
+      user: user,
+      path: path,
+      preview: String.replace_suffix(path, "/opt-out", "")
+    }
   end
 
-  test "the footer link shows a page with one button and changes nothing", %{conn: conn} = ctx do
-    conn = get(conn, ctx.path)
-    assert inertia_component(conn) == "email-opt-out/show"
-    assert %{email: email, subscribed: true} = inertia_props(conn)
-    assert email == ctx.user.email
+  test "GET previews a subscription without changing it, with or without a bearer", ctx do
+    for conn <- [ctx.conn, bearer(ctx.conn, Accounts.generate_api_token(ctx.user).token)] do
+      assert json_response(get(conn, ctx.preview), 200)["data"] == %{
+               "email" => ctx.user.email,
+               "subscribed" => true
+             }
+    end
+
     assert Repo.reload!(ctx.user).optional_emails
   end
 
-  test "RFC 8058 one-click POST works with no session or CSRF token, twice", %{conn: conn} = ctx do
+  test "JSON opt-out is idempotent, returns the subscription and audits once", ctx do
     for _ <- 1..2 do
-      conn = post(conn, ctx.path, %{"List-Unsubscribe" => "One-Click"})
-      assert response(conn, 200) == ""
+      assert json_response(post(ctx.conn, ctx.path, %{}), 200)["data"] == %{
+               "email" => ctx.user.email,
+               "subscribed" => false
+             }
     end
 
     refute Repo.reload!(ctx.user).optional_emails
 
-    # Tests skip CSRF checks, so prove the route has none: no session, no forgery check.
-    assert %{pipe_through: [:one_click]} =
-             Phoenix.Router.route_info(StarterKitWeb.Router, "POST", ctx.path, "localhost")
+    assert Repo.aggregate(
+             from(a in AuditEvent, where: a.action == "user.optional_emails_stopped"),
+             :count
+           ) == 1
+
+    assert json_response(get(ctx.conn, ctx.preview), 200)["data"]["subscribed"] == false
   end
 
-  test "the page button unsubscribes and the page then says so", %{conn: conn} = ctx do
-    conn = conn |> inertia() |> post(ctx.path, %{})
-    assert redirected_to(conn, 303) == ctx.path
+  test "RFC 8058 form POST works without cookies or CSRF and returns a bare 200", ctx do
+    conn = put_req_header(ctx.conn, "content-type", "application/x-www-form-urlencoded")
 
-    conn = get(build_conn(), ctx.path)
-    assert %{subscribed: false} = inertia_props(conn)
+    for _ <- 1..2 do
+      response = post(conn, ctx.path, "List-Unsubscribe=One-Click")
+      assert response(response, 200) == ""
+      assert get_resp_header(response, "set-cookie") == []
+    end
+
+    refute Repo.reload!(ctx.user).optional_emails
   end
 
-  test "a token that names nobody: 404 on POST, home with a message on GET", %{conn: conn} = ctx do
-    bad = ctx.path |> String.replace("/opt-out", "x/opt-out")
+  test "bad tokens and changed-address tokens are 404", ctx do
+    assert_error(get(ctx.conn, "/api/v1/email-subscriptions/bad"), 404, "not_found")
+    assert_error(post(ctx.conn, "/api/v1/email-subscriptions/bad/opt-out", %{}), 404, "not_found")
+    ctx.user |> Ecto.Changeset.change(email: unique_email()) |> Repo.update!()
+    assert_error(get(ctx.conn, ctx.preview), 404, "not_found")
+    assert_error(post(ctx.conn, ctx.path, %{}), 404, "not_found")
+  end
 
-    assert conn |> post(bad, %{"List-Unsubscribe" => "One-Click"}) |> response(404)
-    assert Repo.reload!(ctx.user).optional_emails
+  test "optional mail sends an API unsubscribe header and a SPA footer link", ctx do
+    {:ok, _} =
+      Notifications.notify(ctx.user, :product_update, %{url: "https://app.example.com/news"})
 
-    conn = get(conn, bad)
-    assert redirected_to(conn) == "/"
-    assert Phoenix.Flash.get(conn.assigns.flash, :error)
+    assert_receive {:email, email}
+    assert email.headers["List-Unsubscribe"] =~ "http://localhost:4000/api/v1/email-subscriptions/"
+    assert email.headers["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
+    assert email.text_body =~ "http://localhost:5173/email-subscriptions/"
+    assert email.text_body =~ "http://localhost:5173/settings/email-preferences"
+  end
+
+  test "opt-out is limited to 120 per minute", ctx do
+    for _ <- 1..120, do: post(ctx.conn, ctx.path, %{})
+    assert_error(post(ctx.conn, ctx.path, %{}), 429, "rate_limited")
   end
 end

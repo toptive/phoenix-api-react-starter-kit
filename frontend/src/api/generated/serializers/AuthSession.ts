@@ -4,7 +4,10 @@
 import type { User } from "./User";
 
 export interface AuthSession {
-  token: string;
+  token: string | null;
   expiresAt: string;
-  user: User | null;
+  sudoUntil: string | null;
+  user: User;
+  impersonator: User | null;
+  newAccount: boolean;
 }

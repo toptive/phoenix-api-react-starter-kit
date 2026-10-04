@@ -1,7 +1,7 @@
 defmodule StarterKitWeb.Api.V1.Auth.SessionController do
   @moduledoc "Password sign-in and bearer session revocation."
   use StarterKitWeb, :controller
-  alias StarterKit.Accounts
+  alias StarterKit.{Accounts, Organizations}
   alias StarterKitWeb.ApiAuth
 
   plug StarterKitWeb.Plugs.RateLimit,
@@ -12,7 +12,7 @@ defmodule StarterKitWeb.Api.V1.Auth.SessionController do
 
     ApiAuth.session_result(
       conn,
-      Accounts.create_api_session(params, ApiAuth.device(conn)),
+      Organizations.create_password_session(params, ApiAuth.device(conn), conn.assigns.api_token),
       "password"
     )
   end
@@ -20,6 +20,6 @@ defmodule StarterKitWeb.Api.V1.Auth.SessionController do
   def delete(conn, _params) do
     conn = authorize!(conn, :delete, scope(conn).user)
     :ok = Accounts.delete_api_token(scope(conn), conn.assigns.api_token)
-    render_data(conn, nil)
+    send_resp(conn, 204, "")
   end
 end

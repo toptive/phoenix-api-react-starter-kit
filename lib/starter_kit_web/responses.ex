@@ -67,7 +67,7 @@ defmodule StarterKitWeb.Responses do
         value -> value
       end
 
-    json(conn, %{data: camelize(data), meta: camelize(meta)})
+    json(conn, %{data: data, meta: camelize(meta)})
   end
 
   @doc "Serializes a collection with pagination metadata."
@@ -85,15 +85,37 @@ defmodule StarterKitWeb.Responses do
     %{
       error: %{
         code: to_string(code),
-        message: t(conn, "errors.api.#{code}"),
+        message: error_message(conn, code),
         details: camelize(details)
       }
     }
   end
 
-  @doc "Returns all changeset message keys as a 422 validation failure."
+  @doc "Renders translated field validation; wrong JSON types are malformed requests."
   def render_validation_error(conn, changeset) do
-    render_error(conn, 422, :validation_failed, I18n.changeset_error_keys(changeset))
+    wrong_type =
+      Enum.any?(changeset.errors, fn {field, {_message, opts}} ->
+        opts[:validation] == :cast and
+          not match?({:parameterized, {Ecto.Enum, _}}, changeset.types[field])
+      end)
+
+    if wrong_type,
+      do: render_error(conn, 400, :bad_request),
+      else:
+        render_error(
+          conn,
+          422,
+          :validation_failed,
+          I18n.validation_details(changeset, locale(conn))
+        )
+  end
+
+  defp error_message(conn, code) do
+    key = "errors.api.#{code}"
+
+    if Map.has_key?(I18n.catalog(locale(conn)), key),
+      do: t(conn, key),
+      else: t(conn, "errors.api.internal_error")
   end
 
   defp camelize(%{__struct__: _} = value), do: value

@@ -39,7 +39,6 @@ defmodule StarterKit.Notifications do
 
   @kinds %{
     "magic_link" => :access,
-    "password_reset" => :access,
     "email_change" => :access,
     "invitation" => :transactional,
     "renewal_notice" => :transactional,
@@ -109,6 +108,7 @@ defmodule StarterKit.Notifications do
       {_, %{id: id, email: email}} when is_binary(id) ->
         data
         |> Map.put("unsubscribe_url", unsubscribe_url(id, email))
+        |> Map.put("unsubscribe_page_url", unsubscribe_page_url(id, email))
         |> Map.put_new("preferences_url", preferences_url())
 
       _ ->
@@ -127,12 +127,19 @@ defmodule StarterKit.Notifications do
   """
   def unsubscribe_url(user_id, email) do
     token = Plug.Crypto.sign(secret_key_base(), @unsubscribe_salt, [user_id, email_hash(email)])
-    "#{Application.get_env(:starter_kit, :public_url)}/email-subscriptions/#{token}/opt-out"
+
+    "#{Application.fetch_env!(:starter_kit, :public_url)}/api/v1/email-subscriptions/#{token}/opt-out"
+  end
+
+  @doc "The SPA footer link; scanners can open it without unsubscribing."
+  def unsubscribe_page_url(user_id, email) do
+    token = Plug.Crypto.sign(secret_key_base(), @unsubscribe_salt, [user_id, email_hash(email)])
+    "#{Application.fetch_env!(:starter_kit, :spa_origin)}/email-subscriptions/#{token}/opt-out"
   end
 
   @doc "The settings page where a signed-in user turns optional mail on or off."
   def preferences_url,
-    do: "#{Application.get_env(:starter_kit, :public_url)}/settings/email-preferences/edit"
+    do: "#{Application.fetch_env!(:starter_kit, :spa_origin)}/settings/email-preferences"
 
   @doc """
   Reads an unsubscribe token: `{:ok, user_id, email_hash}` or `:error`. Compare the hash

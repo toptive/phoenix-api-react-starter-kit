@@ -10,13 +10,14 @@ defmodule StarterKit.Accounts.Scope do
 
   alias StarterKit.Accounts.User
 
-  defstruct user: nil, organization: nil, membership: nil, impersonator: nil
+  defstruct user: nil, organization: nil, membership: nil, impersonator: nil, session: nil
 
   @type t :: %__MODULE__{
           user: User.t() | nil,
           organization: struct() | nil,
           membership: struct() | nil,
-          impersonator: User.t() | nil
+          impersonator: User.t() | nil,
+          session: struct() | nil
         }
 
   @doc "Creates a scope for the given user (nil for no user)."
@@ -33,7 +34,7 @@ defmodule StarterKit.Accounts.Scope do
   def put_impersonator(scope, nil), do: scope
 
   @doc "True for a global superadmin (never true while impersonating someone else)."
-  def superadmin?(%__MODULE__{user: %User{role: :superadmin}}), do: true
+  def superadmin?(%__MODULE__{user: %User{role: :superadmin}, impersonator: nil}), do: true
   def superadmin?(_), do: false
 
   @doc "The current organization id (nil outside a tenant)."

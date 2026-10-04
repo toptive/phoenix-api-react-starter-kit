@@ -1,7 +1,7 @@
 defmodule StarterKitWeb.Api.V1.Auth.MagicLinkSessionController do
   @moduledoc "Consumes a magic link by POST so scanners cannot sign the user in."
   use StarterKitWeb, :controller
-  alias StarterKit.Accounts
+  alias StarterKit.Organizations
   alias StarterKitWeb.ApiAuth
 
   plug StarterKitWeb.Plugs.RateLimit, bucket: "api_magic_session", limit: 10, period: 60_000
@@ -11,7 +11,7 @@ defmodule StarterKitWeb.Api.V1.Auth.MagicLinkSessionController do
 
     ApiAuth.session_result(
       conn,
-      Accounts.create_magic_link_session(token, ApiAuth.device(conn)),
+      Organizations.create_link_session(token, ApiAuth.device(conn), conn.assigns.api_token),
       "magic_link"
     )
   end

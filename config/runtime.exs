@@ -1,12 +1,5 @@
 import Config
 
-config :starter_kit,
-  spa_origin: System.get_env("SPA_ORIGIN", "http://localhost:5173"),
-  cors_origins:
-    System.get_env("CORS_ORIGINS", System.get_env("SPA_ORIGIN", "http://localhost:5173"))
-    |> String.split(",", trim: true)
-    |> Enum.map(&String.trim/1)
-
 # Runtime configuration: read from the environment at boot (dev, test and releases).
 # Production env vars are listed in config/deploy.yml and docs/DEPLOY.md.
 
@@ -21,6 +14,20 @@ env = fn name ->
     value -> if String.trim(value) == "", do: nil, else: value
   end
 end
+
+spa_origin = env.("SPA_ORIGIN") || if(config_env() != :prod, do: "http://localhost:5173")
+cors_origins = env.("CORS_ORIGINS") || if(config_env() != :prod, do: spa_origin)
+if is_nil(spa_origin), do: raise("SPA_ORIGIN is required in production")
+if is_nil(cors_origins), do: raise("CORS_ORIGINS is required in production")
+
+config :starter_kit,
+  spa_origin: spa_origin,
+  native_scheme: env.("NATIVE_SCHEME") || "starterkit",
+  cors_origins:
+    Enum.uniq(
+      (cors_origins |> String.split(",", trim: true) |> Enum.map(&String.trim/1)) ++
+        ["capacitor://localhost", "ionic://localhost", "http://localhost"]
+    )
 
 # The Sentry library also reads SENTRY_DSN from the OS env by itself, and a blank exported
 # value would still turn it on. Remove the variable so "blank" means "off" everywhere.

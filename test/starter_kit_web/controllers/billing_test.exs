@@ -74,8 +74,7 @@ defmodule StarterKitWeb.BillingTest do
       page =
         conn
         |> log_in_user(member)
-        |> patch(~p"/current-organization", %{"organizationId" => owner_scope.organization.id})
-        |> recycle()
+        |> put_session(:organization_id, owner_scope.organization.id)
         |> get(~p"/settings/billing")
 
       assert %{canManage: false, plan: "free"} = inertia_props(page)
@@ -155,8 +154,7 @@ defmodule StarterKitWeb.BillingTest do
     conn =
       conn
       |> log_in_user(member)
-      |> patch(~p"/current-organization", %{"organizationId" => owner_scope.organization.id})
-      |> recycle()
+      |> put_session(:organization_id, owner_scope.organization.id)
       |> post(~p"/settings/billing/checkout-session", checkout())
 
     assert conn.status == 403

@@ -117,40 +117,11 @@ defmodule StarterKitWeb.Router do
     get "/legal/:slug", LegalPageController, :show
   end
 
-  # Sign-in (also used to re-authenticate for sudo mode).
-  scope "/", StarterKitWeb do
-    pipe_through :browser
-
-    resources "/invitations", InvitationController, only: [:show], param: "token"
-    delete "/impersonation", ImpersonationController, :delete
-
-    # The footer "Unsubscribe" link: a page with one button (link scanners only GET).
-    get "/email-subscriptions/:token/opt-out", EmailOptOutController, :show
-  end
-
-  # The same URL is the List-Unsubscribe target: the button and mail clients POST here.
-  scope "/", StarterKitWeb do
-    pipe_through :one_click
-
-    post "/email-subscriptions/:token/opt-out", EmailOptOutController, :create
-  end
-
   # Signed-in app.
   scope "/", StarterKitWeb do
     pipe_through [:browser, :authenticated]
 
     resources "/dashboard", DashboardController, only: [:show], singleton: true
-    resources "/onboarding", OnboardingController, only: [:edit, :update], singleton: true
-
-    resources "/current-organization", CurrentOrganizationController,
-      only: [:update],
-      singleton: true
-
-    resources "/organizations", OrganizationController, only: [:new, :create]
-
-    resources "/invitations", InvitationController, only: [], param: "token" do
-      resources "/acceptance", InvitationAcceptanceController, only: [:create], singleton: true
-    end
 
     scope "/settings", Settings, as: :settings do
       resources "/profile", ProfileController, only: [:edit, :update], singleton: true
@@ -161,9 +132,6 @@ defmodule StarterKitWeb.Router do
         singleton: true
 
       resources "/sessions", SessionController, only: [:index, :delete]
-      resources "/organization", OrganizationController, only: [:edit, :update], singleton: true
-      resources "/members", MembershipController, only: [:index, :update, :delete]
-      resources "/invitations", InvitationController, only: [:create, :delete]
 
       resources "/email-confirmations", EmailConfirmationController,
         only: [:show, :create],
@@ -238,9 +206,7 @@ defmodule StarterKitWeb.Router do
       post "/magic-links", MagicLinkController, :create
       post "/magic-links/:token/session", MagicLinkSessionController, :create
       post "/registrations", RegistrationController, :create
-      post "/confirmations/:token", ConfirmationController, :create
-      post "/password-resets", PasswordResetController, :create
-      put "/password-resets/:token", PasswordResetController, :update
+      get "/magic-links/:token", MagicLinkController, :show
       get "/google/start", GoogleStartController, :show
       get "/google/callback", GoogleCallbackController, :create
     end
@@ -251,7 +217,34 @@ defmodule StarterKitWeb.Router do
 
     delete "/session", SessionController, :delete
     post "/sudo", SudoController, :create
-    get "/current-user", CurrentUserController, :show
+    delete "/impersonation", ImpersonationController, :delete
+  end
+
+  scope "/api/v1", StarterKitWeb.Api.V1, as: :api_v1 do
+    pipe_through :api
+    get "/email-subscriptions/:token", EmailSubscriptionController, :show
+    post "/email-subscriptions/:token/opt-out", EmailOptOutController, :create
+    get "/invitations/:token", InvitationController, :show
+  end
+
+  scope "/api/v1", StarterKitWeb.Api.V1, as: :api_v1 do
+    pipe_through [:api, :api_authenticated]
+    put "/current-organization", CurrentOrganizationController, :update
+    post "/organizations", OrganizationController, :create
+    get "/onboarding", OnboardingController, :show
+    put "/onboarding", OnboardingController, :update
+    post "/invitations/:token/acceptance", InvitationAcceptanceController, :create
+
+    scope "/settings", Settings, as: :settings do
+      get "/organization", OrganizationController, :show
+      put "/organization", OrganizationController, :update
+      get "/members", MembershipController, :index
+      put "/members/:id", MembershipController, :update
+      delete "/members/:id", MembershipController, :delete
+      get "/invitations", InvitationController, :index
+      post "/invitations", InvitationController, :create
+      delete "/invitations/:id", InvitationController, :delete
+    end
   end
 
   # JSON API with bearer authentication. Envelope: { data, meta } / { error }.

@@ -97,15 +97,11 @@ defmodule StarterKit.Notifications.Email do
     end
   end
 
-  # RFC 8058: mail clients show an "Unsubscribe" button and POST
-  # `List-Unsubscribe=One-Click` to the URL (no login, no cookies). One-click needs HTTPS;
-  # a plain-http URL (dev) keeps only List-Unsubscribe.
+  # RFC 8058: the signed API target needs neither a session nor a CSRF token.
   defp unsubscribe_headers(email, url) do
-    email = header(email, "List-Unsubscribe", "<#{url}>")
-
-    if String.starts_with?(url, "https://"),
-      do: header(email, "List-Unsubscribe-Post", "List-Unsubscribe=One-Click"),
-      else: email
+    email
+    |> header("List-Unsubscribe", "<#{url}>")
+    |> header("List-Unsubscribe-Post", "List-Unsubscribe=One-Click")
   end
 
   # A missing catalogue key comes back as the key itself.
@@ -128,7 +124,9 @@ defmodule StarterKit.Notifications.Email do
   defp footer_links(data, locale) do
     [
       data["preferences_url"] && {I18n.t("mail.preferences", %{}, locale), data["preferences_url"]},
-      data["unsubscribe_url"] && {I18n.t("mail.unsubscribe", %{}, locale), data["unsubscribe_url"]}
+      data["unsubscribe_url"] &&
+        {I18n.t("mail.unsubscribe", %{}, locale),
+         data["unsubscribe_page_url"] || data["unsubscribe_url"]}
     ]
     |> Enum.filter(& &1)
   end

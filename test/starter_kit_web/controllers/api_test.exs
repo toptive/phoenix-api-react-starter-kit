@@ -1,6 +1,8 @@
 defmodule StarterKitWeb.ApiTest do
   use StarterKitWeb.ConnCase, async: true
 
+  setup %{conn: conn}, do: %{conn: put_req_header(conn, "content-type", "application/json")}
+
   test "direct uploads need a bearer token and answer in the envelope", %{conn: conn} do
     conn = put_req_header(conn, "accept", "application/json")
 

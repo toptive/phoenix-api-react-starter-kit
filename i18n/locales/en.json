@@ -536,9 +536,17 @@
   "errors.api.oauth_failed": "We could not sign you in with Google. Try again.",
   "validation.invalid": "This value is not valid.",
   "flash.magic_link_sent": "If your account is available, check your inbox for a sign-in link.",
-  "mail.password_reset.subject": "Reset your password for {{app}}",
-  "mail.password_reset.headline": "Choose a new password",
-  "mail.password_reset.lead": "Use the button to choose a new password. This link expires in 15 minutes.",
-  "mail.password_reset.action": "Reset password",
-  "mail.password_reset.note1": "Did not ask for this link? Ignore this email."
+  "errors.api.session_expired": "Your session has ended. Sign in again.",
+  "errors.api.magic_link_invalid": "This sign-in link has expired. Ask for a new one.",
+  "errors.api.email_change_invalid": "This email change link has expired.",
+  "errors.api.invitation_invalid": "This invitation is no longer available.",
+  "errors.api.last_owner": "Add another owner before leaving.",
+  "errors.api.not_member": "You do not belong to that organization.",
+  "errors.api.email_mismatch": "Sign in with the invited email address.",
+  "errors.api.conflict": "This change cannot be made right now.",
+  "errors.api.invalid_json": "Send a valid JSON body.",
+  "errors.api.turnstile_failed": "Complete the verification and try again.",
+  "errors.api.email_not_verified": "Google has not verified your email address.",
+  "errors.api.state_invalid": "This sign-in attempt has expired. Try again.",
+  "validation.limit_reached": "This plan allows up to {{limit}} people."
 }

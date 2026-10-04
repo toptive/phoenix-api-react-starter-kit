@@ -7,4 +7,5 @@ export interface Session {
   ipAddress: string | null;
   authenticatedAt: string | null;
   insertedAt: string;
+  current: boolean;
 }

@@ -29,6 +29,11 @@ defmodule StarterKitWeb.Plugs.ErrorResponses do
         conn
       end
 
+    conn =
+      if String.starts_with?(conn.request_path, "/api/"),
+        do: put_resp_header(conn, "cache-control", "private, no-store"),
+        else: conn
+
     register_before_send(conn, &mark_error/1)
   end
 

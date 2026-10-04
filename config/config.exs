@@ -68,7 +68,11 @@ config :starter_kit, Oban,
     Oban.Plugins.Lifeline,
     # Recurring work (perform/1 = one context call). A job whose feature is off returns
     # :ok at once; it never snoozes.
-    {Oban.Plugins.Cron, crontab: [{"0 8 * * *", StarterKit.Billing.NoticeSweepWorker}]}
+    {Oban.Plugins.Cron,
+     crontab: [
+       {"0 8 * * *", StarterKit.Billing.NoticeSweepWorker},
+       {"0 3 * * *", StarterKit.Accounts.TokenCleanupWorker}
+     ]}
   ]
 
 # AI-training crawlers allowed in robots.txt (search and AI-answer bots always are).

@@ -158,6 +158,17 @@ defmodule StarterKit.Billing do
     end)
   end
 
+  @doc "Reserves invitation capacity and creates the invitation under the organization lock."
+  def invite_member(scope, attrs, url_fun, locale) do
+    if Notifications.email_available?() do
+      with_capacity(scope, :members, fn -> Organizations.invitation_seat_count(scope) end, fn ->
+        Organizations.create_invitation(scope, attrs, url_fun, locale)
+      end)
+    else
+      {:error, :email_unavailable}
+    end
+  end
+
   defp write_within(:unlimited, _key, _count_fun, write_fun), do: write_fun.()
 
   defp write_within(max, key, count_fun, write_fun) do

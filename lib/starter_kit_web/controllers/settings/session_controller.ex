@@ -15,7 +15,8 @@ defmodule StarterKitWeb.Settings.SessionController do
     conn = authorize!(conn, :show, scope(conn).user)
     sessions = Accounts.list_sessions(scope(conn))
     current_token = get_session(conn, :user_token)
-    current = Enum.find(sessions, &(&1.token == current_token))
+    current_hash = :crypto.hash(:sha256, current_token)
+    current = Enum.find(sessions, &(&1.token_hash == current_hash))
 
     render_inertia(conn, "settings/sessions/index", %{
       sessions: Serializers.SessionSerializer.serialize_many(sessions),

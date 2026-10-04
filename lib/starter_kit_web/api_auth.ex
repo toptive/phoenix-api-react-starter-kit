@@ -18,61 +18,69 @@ defmodule StarterKitWeb.ApiAuth do
   @doc "Google's fixed API callback URL."
   def google_callback_url, do: StarterKitWeb.Endpoint.url() <> "/api/v1/auth/google/callback"
 
-  @doc "Starts OAuth with a signed state bound to this browser's transient cookie."
-  def start_google(conn) do
-    nonce = Base.url_encode64(:crypto.strong_rand_bytes(32), padding: false)
+  @doc "Starts Google with signed state and no cookie."
+  def start_google(conn, params) do
+    client = params["client"] || "web"
+    return_to = params["return_to"] || "/dashboard"
 
-    state =
-      Phoenix.Token.sign(StarterKitWeb.Endpoint, "google-api-state", %{
-        nonce: nonce,
-        locale: Responses.locale(conn)
-      })
+    if client in ["web", "native"] and valid_return_to?(return_to) do
+      state =
+        Phoenix.Token.sign(StarterKitWeb.Endpoint, "google-api-state", %{
+          nonce: Base.url_encode64(:crypto.strong_rand_bytes(32), padding: false),
+          client: client,
+          returnTo: return_to,
+          locale: Responses.locale(conn),
+          iat: System.system_time(:second)
+        })
 
-    config = Application.get_env(:ueberauth, Ueberauth.Strategy.Google.OAuth, [])
+      config = Application.get_env(:ueberauth, Ueberauth.Strategy.Google.OAuth, [])
 
-    query =
-      URI.encode_query(%{
-        client_id: config[:client_id],
-        redirect_uri: google_callback_url(),
-        response_type: "code",
-        scope: "openid email profile",
-        state: state
-      })
+      query =
+        URI.encode_query(%{
+          client_id: config[:client_id],
+          redirect_uri: google_callback_url(),
+          response_type: "code",
+          scope: "openid email profile",
+          prompt: "select_account",
+          state: state
+        })
 
-    conn
-    |> put_resp_cookie("_api_oauth_state", nonce,
-      http_only: true,
-      same_site: "Lax",
-      secure: Application.get_env(:starter_kit, :secure_cookies, false),
-      max_age: 600,
-      path: "/api/v1/auth/google"
-    )
-    |> Phoenix.Controller.redirect(
-      external: "https://accounts.google.com/o/oauth2/v2/auth?" <> query
-    )
-  end
-
-  @doc "Validates signed state and browser binding before exchanging a provider code."
-  def google_state(conn, state) when is_binary(state) do
-    conn = fetch_cookies(conn)
-
-    with {:ok, %{nonce: nonce, locale: locale}} <-
-           Phoenix.Token.verify(StarterKitWeb.Endpoint, "google-api-state", state, max_age: 600),
-         cookie when is_binary(cookie) <- conn.cookies["_api_oauth_state"],
-         true <- Plug.Crypto.secure_compare(cookie, nonce) do
-      {:ok, locale}
+      Phoenix.Controller.redirect(conn,
+        external: "https://accounts.google.com/o/oauth2/v2/auth?" <> query
+      )
     else
-      _ -> {:error, :oauth_failed}
+      Responses.render_error(conn, 400, :bad_request)
     end
   end
 
-  def google_state(_conn, _state), do: {:error, :oauth_failed}
+  defp valid_return_to?(path) when is_binary(path) do
+    String.starts_with?(path, "/") and String.length(path) <= 200 and
+      not String.contains?(path, ["//", "\\", "\r", "\n"])
+  end
 
-  @doc "Redirects to the SPA using a fragment so tokens never enter its request URL."
-  def google_result(conn, result) do
+  defp valid_return_to?(_path), do: false
+
+  @doc "Verifies the signed state and its ten-minute window."
+  def google_state(state) when is_binary(state) do
+    with {:ok, %{client: client, returnTo: return_to, locale: locale, iat: iat} = payload} <-
+           Phoenix.Token.verify(StarterKitWeb.Endpoint, "google-api-state", state, max_age: 600),
+         true <- client in ["web", "native"] and valid_return_to?(return_to),
+         true <- locale in StarterKit.I18n.locales(),
+         true <-
+           is_integer(iat) and iat <= System.system_time(:second) and
+             System.system_time(:second) - iat <= 600 do
+      {:ok, payload}
+    else
+      _ -> {:error, :state_invalid}
+    end
+  end
+
+  def google_state(_state), do: {:error, :state_invalid}
+
+  @doc "Returns tokens in a fragment to the configured web or native handoff."
+  def google_result(conn, result, state \\ %{}) do
     conn =
       conn
-      |> delete_resp_cookie("_api_oauth_state", path: "/api/v1/auth/google")
       |> put_resp_header("cache-control", "private, no-store")
       |> put_resp_header("referrer-policy", "no-referrer")
 
@@ -80,13 +88,27 @@ defmodule StarterKitWeb.ApiAuth do
       case result do
         {:ok, session} ->
           Analytics.track("user_signed_in", session.user, %{method: "google"})
-          URI.encode_query(%{token: session.token})
+
+          if session.new_account,
+            do: Analytics.track("user_registered", session.user, %{via: "google"})
+
+          URI.encode_query([
+            {"token", session.token},
+            {"expiresAt", DateTime.to_iso8601(session.expires_at)},
+            {"new", if(session.new_account, do: "1", else: "0")},
+            {"returnTo", state[:returnTo] || "/dashboard"}
+          ])
 
         {:error, reason} ->
           URI.encode_query(%{error: reason})
       end
 
-    Phoenix.Controller.redirect(conn, external: spa_url("/auth/callback#" <> fragment))
+    destination =
+      if state[:client] == "native",
+        do: Application.fetch_env!(:starter_kit, :native_scheme) <> "://auth/callback",
+        else: spa_url("/auth/callback")
+
+    Phoenix.Controller.redirect(conn, external: destination <> "#" <> fragment)
   end
 
   @doc "Returns an issued session or the standard error envelope."
@@ -106,16 +128,34 @@ defmodule StarterKitWeb.ApiAuth do
   def error(conn, %Ecto.Changeset{} = changeset),
     do: Responses.render_validation_error(conn, changeset)
 
+  def error(conn, {:limit_reached, :members, limit}) do
+    Responses.render_error(conn, 422, :validation_failed, %{
+      email: [
+        StarterKit.I18n.field_error(
+          "validation.limit_reached",
+          %{limit: limit},
+          Responses.locale(conn)
+        )
+      ]
+    })
+  end
+
   def error(conn, reason) do
     status =
       case reason do
         :invalid_credentials -> 401
         :forbidden -> 403
-        reason when reason in [:signup_closed, :invitation_required] -> 403
+        reason when reason in [:not_member, :last_owner, :email_mismatch, :not_impersonating] -> 409
+        :not_found -> 404
+        :bad_request -> 400
         :email_unavailable -> 503
         _ -> 422
       end
 
-    Responses.render_error(conn, status, reason)
+    Responses.render_error(
+      conn,
+      status,
+      if(reason == :not_impersonating, do: :conflict, else: reason)
+    )
   end
 end

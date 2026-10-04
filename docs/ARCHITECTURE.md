@@ -98,13 +98,11 @@ Concurrency stays below the DB pool (`POOL_SIZE` 8, jobs 5 + 2). Oban Web at `/a
   `render_collection/4` serializes a list and includes pagination metadata.
 - `render_error/4` returns `{error: {code, message, details}}`. Codes are stable English;
   messages use the request locale. `render_validation_error/2` returns 422 `validation_failed`
-  with field → lists of message keys. Details and identifier keys are camelCase; dotted
+  with field → `{key, message, bindings?}` lists. Details and identifier keys are camelCase; dotted
   translation keys and locale identifiers retain their spelling.
 - Only `render_data`, `render_collection` and `render_error` may call `json/2`; architecture
   tests enforce this. `ErrorJSON` reuses the envelope builder for unmatched routes and errors.
   `ErrorResponses` marks API requests as JSON and all errors as private, no-store and noindex.
-- Unconverted Inertia areas retain `render_inertia/3`, `render_public/3`, translated form errors
-  and runtime `page/2` prop validation. The dependency stays until the final conversion.
 
 ## 8. API request pipeline
 
@@ -117,13 +115,13 @@ The `:api` pipeline accepts JSON, fetches query parameters, converts incoming ke
 There is no session fetch or CSRF check. Locale order: `?locale=` → quality-ranked
 `Accept-Language` → authenticated user's preference → CSV default. Cookies are not consulted.
 
-`require_authenticated_api_user` returns 401; `BearerAuth.require_sudo` returns 401
+`require_authenticated_api_user` returns 401; `BearerAuth.require_sudo` returns 403
 `sudo_required`; `BearerAuth.require_superadmin` returns 404 for anonymous, ordinary or
 impersonating callers. Contexts receive the resolved `%Scope{}` for tenant queries.
 
-`GET /api/v1/bootstrap` is public and returns nullable user/organization/membership,
-organizations, impersonator, superadmin, locale/locales/i18nVersion, public flags, app and
-Turnstile configuration. Personalized bootstrap responses are private, no-store.
+`GET /api/v1/bootstrap` is public and returns nullable `auth` (user, organization, membership,
+organizations, impersonator, superadmin, onboardingRequired, sudoUntil, sessionId),
+locale/locales/i18nVersion, public flags, app and Turnstile configuration. Personalized bootstrap responses are private, no-store.
 `GET /api/v1/locales/:locale` returns a flat map in `data`; its ETag combines locale and i18n
 version, and matching `If-None-Match` returns 304. Unknown locales return 404.
 
@@ -135,5 +133,6 @@ frontend's snapshot; new API controllers never use `Typelizer.InertiaPage`.
 
 Unconverted areas retain `SnakeCaseParams → secure headers + CSP nonce → cookie scope →
 locale → Inertia → ValidateProps → shared props`. Signed-in and superadmin checks stay in place.
-Their sign-in redirects point to the SPA. Browser sessions are a temporary compatibility layer;
-the new API never accepts them.
+Their sign-in redirects point to the SPA. Browser sessions use the shared digested `sessions` table; their cookie transport is a temporary compatibility layer;
+the new API never accepts them. Remaining browser controllers retain Inertia rendering,
+`page/2` runtime prop validation and form redirects until their conversion.

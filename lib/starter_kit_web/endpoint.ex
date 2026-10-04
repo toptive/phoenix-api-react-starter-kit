@@ -63,13 +63,7 @@ defmodule StarterKitWeb.Endpoint do
 
   plug StarterKitWeb.Plugs.Cors
 
-  plug Plug.Parsers,
-    parsers: [:urlencoded, :multipart, :json],
-    pass: ["*/*"],
-    length: 8_000_000,
-    json_decoder: Phoenix.json_library(),
-    # Keeps the raw bytes of /webhooks/* for signature checks.
-    body_reader: {StarterKitWeb.Plugs.RawBody, :read_body, []}
+  plug StarterKitWeb.Plugs.ApiTransport
 
   plug Sentry.PlugContext, body_scrubber: {__MODULE__, :scrub_body}
   plug Plug.MethodOverride

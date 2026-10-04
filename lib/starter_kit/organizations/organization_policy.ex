@@ -21,6 +21,9 @@ defmodule StarterKit.Organizations.OrganizationPolicy do
 
   def authorize(%Scope{} = scope, :switch, %Organization{}), do: not is_nil(scope.user)
 
+  def authorize(%Scope{user: user}, :create, Organization),
+    do: not is_nil(user) and StarterKit.Organizations.mode() == :multi
+
   def authorize(_scope, _action, _resource), do: false
 
   @doc false

@@ -536,9 +536,17 @@
   "errors.api.oauth_failed": "No pudimos ingresar con Google. Probá de nuevo.",
   "validation.invalid": "Este valor no es válido.",
   "flash.magic_link_sent": "Si tu cuenta está disponible, revisá tu email para encontrar el enlace de acceso.",
-  "mail.password_reset.subject": "Restablecé tu contraseña de {{app}}",
-  "mail.password_reset.headline": "Elegí una contraseña nueva",
-  "mail.password_reset.lead": "Usá el botón para elegir una contraseña nueva. Este enlace vence en 15 minutos.",
-  "mail.password_reset.action": "Restablecer contraseña",
-  "mail.password_reset.note1": "¿No pediste este enlace? Ignorá este email."
+  "errors.api.session_expired": "Tu sesión terminó. Ingresá de nuevo.",
+  "errors.api.magic_link_invalid": "Este enlace de ingreso venció. Pedí uno nuevo.",
+  "errors.api.email_change_invalid": "Este enlace para cambiar el email venció.",
+  "errors.api.invitation_invalid": "Esta invitación ya no está disponible.",
+  "errors.api.last_owner": "Agregá otro propietario antes de salir.",
+  "errors.api.not_member": "No pertenecés a esa organización.",
+  "errors.api.email_mismatch": "Ingresá con el email invitado.",
+  "errors.api.conflict": "Este cambio no se puede hacer ahora.",
+  "errors.api.invalid_json": "Enviá un cuerpo JSON válido.",
+  "errors.api.turnstile_failed": "Completá la verificación y probá de nuevo.",
+  "errors.api.email_not_verified": "Google no verificó tu dirección de email.",
+  "errors.api.state_invalid": "Este intento de ingreso venció. Probá de nuevo.",
+  "validation.limit_reached": "Este plan permite hasta {{limit}} personas."
 }

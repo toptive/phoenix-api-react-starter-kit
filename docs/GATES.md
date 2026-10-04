@@ -22,6 +22,18 @@ When a gate fails, fix the code — never weaken the gate, never add a todo list
 | vitest | `pnpm test` | frontend unit tests |
 | pnpm_audit | `pnpm audit --audit-level=high` | vulnerable npm packages |
 
+## Testing policy
+
+Prefer end-to-end behavior through the public surface. Backend request tests use the real HTTP
+router, bearer plug, policies, database, serializers and envelope. Cover each endpoint's success,
+validation, unauthorized, forbidden and tenant isolation outcomes, and chain endpoints in flow
+tests. Context tests are reserved for real branching such as money, dates, policies and parsers.
+Do not test private helpers, standalone serializers or trivial getters.
+
+SPA user flows use Playwright in `frontend/e2e/` against the real backend. Vitest covers pure
+functions such as envelope parsing and date/money formatting; no component render tests with
+mocked APIs. Architecture tests continue to guard the rulebook and remain part of `mix test`.
+
 ## Architecture tests (`test/architecture`)
 
 - every controller action authorizes or opts out;

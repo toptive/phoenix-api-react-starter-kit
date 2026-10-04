@@ -6,22 +6,21 @@ defmodule StarterKitWeb.Api.V1.LocaleController do
   def show(conn, %{"locale" => requested}) do
     conn = skip_authorization(conn)
 
-    if requested in I18n.locales() do
-      etag = ~s("#{requested}:#{I18n.version()}")
+    case I18n.locale_catalog(requested) do
+      {:ok, %{catalog: catalog, version: version}} ->
+        etag = ~s("#{requested}:#{version}")
 
-      conn =
-        conn
-        |> put_resp_header("etag", etag)
-        |> put_resp_header("cache-control", "public, max-age=0, must-revalidate")
+        conn =
+          conn
+          |> put_resp_header("etag", etag)
+          |> put_resp_header("cache-control", "public, no-cache")
 
-      if matches?(conn, etag) do
-        send_resp(conn, 304, "")
-      else
-        data = Serializers.LocaleSerializer.serialize(%{translations: I18n.catalog(requested)})
-        render_data(conn, data["translations"])
-      end
-    else
-      render_error(conn, 404, :not_found)
+        if matches?(conn, etag),
+          do: send_resp(conn, 304, ""),
+          else: render_data(conn, catalog, %{locale: requested, version: version})
+
+      {:error, :not_found} ->
+        render_error(conn, 404, :not_found)
     end
   end
 

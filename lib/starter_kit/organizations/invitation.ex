@@ -33,6 +33,7 @@ defmodule StarterKit.Organizations.Invitation do
     |> validate_exclusion(:role, [:owner], message: "validation.invitation_owner")
     |> unique_constraint([:organization_id, :email],
       name: :invitations_pending_email_index,
+      error_key: :email,
       message: "validation.invitation_pending"
     )
   end

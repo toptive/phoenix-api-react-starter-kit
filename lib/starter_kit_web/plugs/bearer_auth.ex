@@ -4,7 +4,7 @@ defmodule StarterKitWeb.Plugs.BearerAuth do
   import Plug.Conn
 
   alias StarterKit.Accounts
-  alias StarterKit.Accounts.Scope
+  alias StarterKit.Accounts.{Scope, Session, User}
   alias StarterKit.Organizations
   alias StarterKitWeb.Responses
 
@@ -16,13 +16,19 @@ defmodule StarterKitWeb.Plugs.BearerAuth do
     with [header] <- get_req_header(conn, "authorization"),
          [scheme, encoded] <- String.split(header, " ", parts: 2),
          true <- String.downcase(scheme) == "bearer",
-         {user, token} <- Accounts.get_user_by_api_token(encoded) do
+         {%User{} = user, %Session{} = token} <- Accounts.get_user_by_api_token(encoded) do
       scope =
         user
         |> Scope.for_user()
-        |> Scope.put_impersonator(token.impersonator)
-        |> Organizations.scope_for()
+        |> Scope.put_impersonator(token.impersonator_user)
+        |> Organizations.scope_for(token.organization_id)
 
+      {:ok, token} =
+        if token.organization_id == scope.organization.id,
+          do: {:ok, token},
+          else: Accounts.set_session_organization(token, scope.organization.id)
+
+      scope = %{scope | session: token}
       StarterKit.Monitoring.set_user(user.id)
 
       conn
@@ -30,6 +36,9 @@ defmodule StarterKitWeb.Plugs.BearerAuth do
       |> assign(:current_scope, scope)
       |> assign(:api_token, token)
     else
+      {:error, :session_expired} ->
+        conn |> Responses.render_error(401, :session_expired) |> halt()
+
       _ ->
         conn |> assign(:current_user, nil) |> assign(:current_scope, nil) |> assign(:api_token, nil)
     end
@@ -49,7 +58,7 @@ defmodule StarterKitWeb.Plugs.BearerAuth do
          %{impersonator: nil} <- conn.assigns[:current_scope] do
       conn
     else
-      _ -> conn |> Responses.render_error(401, :sudo_required) |> halt()
+      _ -> conn |> Responses.render_error(403, :sudo_required) |> halt()
     end
   end
 

@@ -5,7 +5,13 @@ defmodule StarterKitWeb.TurnstileTest do
 
   setup %{conn: conn} do
     put_flag(:turnstile, true)
-    %{conn: %{conn | remote_ip: {192, 0, 2, rem(System.unique_integer([:positive]), 250)}}}
+
+    %{
+      conn: %{
+        put_req_header(conn, "content-type", "application/json")
+        | remote_ip: {192, 0, 2, rem(System.unique_integer([:positive]), 250)}
+      }
+    }
   end
 
   defp answer(body), do: Req.Test.stub(AbuseProtection, &Req.Test.json(&1, body))
@@ -28,7 +34,10 @@ defmodule StarterKitWeb.TurnstileTest do
       result = sign_up(conn, email, token)
 
       assert json_response(result, 422)["error"]["details"]["turnstileToken"] == [
-               "validation.turnstile_required"
+               %{
+                 "key" => "validation.turnstile_required",
+                 "message" => StarterKit.I18n.t("validation.turnstile_required")
+               }
              ]
 
       refute Accounts.get_user_by_email(email)
@@ -40,7 +49,7 @@ defmodule StarterKitWeb.TurnstileTest do
   test "a passing challenge creates the account", %{conn: conn} do
     accept("registration")
     email = unique_email()
-    assert json_response(sign_up(conn, email, "valid"), 201)
+    assert json_response(sign_up(conn, email, "valid"), 202)
     assert Accounts.get_user_by_email(email)
     assert_email_sent()
   end
@@ -61,7 +70,7 @@ defmodule StarterKitWeb.TurnstileTest do
 
     assert json_response(
              post(conn, ~p"/api/v1/auth/magic-links", %{email: user.email, turnstileToken: "valid"}),
-             200
+             202
            )
 
     assert_email_sent()
@@ -91,6 +100,6 @@ defmodule StarterKitWeb.TurnstileTest do
              "siteKey" => nil
            }
 
-    assert json_response(sign_up(conn, unique_email(), nil), 201)
+    assert json_response(sign_up(conn, unique_email(), nil), 202)
   end
 end
