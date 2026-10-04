@@ -144,8 +144,8 @@ Details: [docs/TYPE_CONTRACT.md](docs/TYPE_CONTRACT.md).
 - **There is no CI.** Four layers: `.claude/hooks/architecture-check` (after each Claude edit),
   `.githooks/pre-commit` (staged files), `.githooks/pre-push` (`mix check`), `/deploy` (again).
   `mix setup` installs the hooks. Details: [docs/GATES.md](docs/GATES.md).
-- Every context function has a test; every page renders in a controller test (typelizer validates
-  its props); every tenant schema has an isolation test.
+- Prefer HTTP request tests and browser flows through the public API; use context unit tests
+  for branching logic only. Every tenant schema has an isolation test.
 - SPA journeys live in `frontend/e2e/` and run in Chromium against the real kit API (`pnpm e2e`).
   Never mock the browser's API. Vitest is for pure functions and HTTP envelope handling only;
   no component render tests with mocked APIs. Backend lanes own API boot and external HTTP stubs.

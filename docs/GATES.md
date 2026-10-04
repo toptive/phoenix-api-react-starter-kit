@@ -114,10 +114,10 @@ Password setup, onboarding and subsequent business actions go through the API. S
 `E2E_API_DIR` to the Phoenix checkout and `E2E_PGDATABASE` to a name containing `e2e` or `test`;
 normal local `PG*` settings apply. Rails/Rust replace this file with their test helper.
 
-Backend `bin/check` owns API boot: create/migrate the isolated DB, start the API with local
+Each kit's `bin/check` must own API boot: create/migrate the isolated DB, start the API with local
 mail and upstream stubs, wait for `/health`, run the frontend gates and `pnpm e2e`, and stop
-the API in an EXIT/INT/TERM trap. Phoenix currently uses development configuration because
-its test configuration is not a standalone browser server. If another lane edits the API,
+the API in an EXIT/INT/TERM trap. Use a standalone browser-server configuration with local
+mail and real job execution. If another lane edits the API,
 run an immutable snapshot of its committed revision in `/tmp`, with its own build directory,
 and point `E2E_API_DIR` there. Start it with `mix run --no-start --no-halt -e` and apply this endpoint override
 before `Application.ensure_all_started(:starter_kit)`:
