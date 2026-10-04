@@ -107,6 +107,15 @@ defmodule StarterKitWeb.ApiOrganizationsTest do
     membership_fixture(other, ctx.user)
     other_session = sign_in(ctx.conn, ctx.user)
 
+    # Choose this device's workspace explicitly before changing the other device.
+    # A fresh sign-in without a saved preference picks the first membership by name.
+    assert json_response(
+             put(bearer(ctx.conn, other_session["token"]), ~p"/api/v1/current-organization", %{
+               organizationId: ctx.scope.organization.id
+             }),
+             200
+           )["data"]["organization"]["id"] == ctx.scope.organization.id
+
     response =
       put(ctx.auth, ~p"/api/v1/current-organization", %{organizationId: other.organization.id})
       |> json_response(200)

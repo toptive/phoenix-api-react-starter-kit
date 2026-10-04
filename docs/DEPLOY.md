@@ -34,7 +34,7 @@ docker run -d --name starter-kit-smoke-app --network starter-kit-smoke -p 4400:4
   -e CORS_ORIGINS=http://localhost:4400 -e POOL_SIZE=2 starter-kit:local
 curl -fsS http://localhost:4400/health
 docker image inspect starter-kit:local --format '{{.Size}}'
-docker rm -f starter-kit-smoke-app starter-kit-smoke-db
+docker rm -fv starter-kit-smoke-app starter-kit-smoke-db
 docker network rm starter-kit-smoke
 ```
 

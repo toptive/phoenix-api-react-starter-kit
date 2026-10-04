@@ -1,11 +1,29 @@
 /** Per-kit fixture seam. Rails/Rust implement these exports against their isolated test backend. */
 import { execFileSync, spawn } from "node:child_process"
+import { join } from "node:path"
 import { setTimeout as delay } from "node:timers/promises"
 
 function database() {
   const name = process.env.E2E_PGDATABASE ?? "starter_kit_e2e"
   if (!/(?:e2e|test)/.test(name)) throw new Error("Fixtures require an isolated e2e/test database")
   return name
+}
+function backendOptions(apiURL = process.env.E2E_API_URL ?? "http://localhost:4100") {
+  const cwd = process.env.E2E_API_DIR ?? new URL("../..", import.meta.url).pathname
+  return {
+    cwd,
+    env: {
+      ...process.env,
+      MIX_ENV: "test",
+      E2E: "1",
+      MIX_BUILD_PATH: process.env.MIX_BUILD_PATH ?? join(cwd, "_build/e2e"),
+      E2E_PGDATABASE: database(),
+      PORT: new URL(apiURL).port,
+      PGDATABASE: database(),
+      ERL_FLAGS: process.env.ERL_FLAGS ?? "+S 2:2",
+      SPA_ORIGIN: process.env.E2E_BASE_URL ?? `http://localhost:${process.env.E2E_VITE_PORT ?? "5174"}`,
+    },
+  }
 }
 function run(code: string) {
   const result = execFileSync(
@@ -30,19 +48,7 @@ function run(code: string) {
   `,
     ],
     {
-      cwd: process.env.E2E_API_DIR ?? new URL("../..", import.meta.url).pathname,
-      env: {
-        ...process.env,
-        MIX_ENV: "test",
-        MIX_BUILD_PATH: process.env.MIX_BUILD_PATH ?? new URL("../../_build/e2e", import.meta.url).pathname,
-        E2E: "1",
-        E2E_PGDATABASE: database(),
-        PORT: process.env.E2E_PORT ?? "4100",
-
-        PGDATABASE: database(),
-        ERL_FLAGS: "+S 2:2",
-        SPA_ORIGIN: process.env.E2E_BASE_URL ?? `http://localhost:${process.env.E2E_VITE_PORT ?? "5174"}`,
-      },
+      ...backendOptions(),
       encoding: "utf8",
       timeout: 30_000,
     },
@@ -76,15 +82,25 @@ export function seedUser(email: string, admin = false): { token: string; expires
 }
 /** Expire just this session's sudo clock to exercise real reauthentication. */
 export function expireSudo(sessionId: string) {
-  run(`
-    import Ecto.Query
-    session_id = "${uuid(sessionId)}"
-    StarterKit.Repo.update_all(
-      from(s in StarterKit.Accounts.Session, where: s.id == ^session_id),
-      set: [sudo_until: DateTime.add(DateTime.utc_now(:second), -60, :second)]
-    )
-    IO.puts("ok")
-  `)
+  execFileSync(
+    "psql",
+    [
+      "-X",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      `UPDATE sessions SET sudo_until = NOW() - INTERVAL '1 minute' WHERE id = '${uuid(sessionId)}'`,
+    ],
+    {
+      env: {
+        ...process.env,
+        PGDATABASE: database(),
+        PGUSER: process.env.PGUSER ?? "postgres",
+        PGPASSWORD: process.env.PGPASSWORD ?? "postgres",
+      },
+      stdio: "pipe",
+    },
+  )
 }
 /** Queue real optional mail; the running API delivers it into its dev mailbox. */
 export function sendOptionalEmail(userId: string) {
@@ -122,8 +138,7 @@ export async function startBillingOffApi() {
   `,
     ],
     {
-      cwd: process.env.E2E_API_DIR ?? new URL("../..", import.meta.url).pathname,
-      env: { ...process.env, MIX_ENV: process.env.MIX_ENV ?? "dev", PGDATABASE: database(), ERL_FLAGS: "+S 2:2" },
+      ...backendOptions(url.href),
       stdio: "ignore",
     },
   )

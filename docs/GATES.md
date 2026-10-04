@@ -125,7 +125,8 @@ Traces and reports live in ignored `frontend/test-results/` and `frontend/playwr
 `frontend/e2e/backend.ts` is the per-kit fixture seam: `seedUser` creates confirmed accounts
 and bearers, bootstraps the first superadmin through `Accounts.bootstrap_superadmin`,
 `expireSudo` expires a session, and `sendOptionalEmail` queues mail for the running API.
-These use isolated `mix run` processes; global setup clears the mailbox once.
+`seedUser` and `sendOptionalEmail` use isolated `mix run` processes; `expireSudo` updates
+only the fixture session clock through `psql`. Global setup clears the mailbox once.
 
 `pnpm lint` includes the catalogue audit. Prune unused keys with
 `node i18n/scripts/audit.mjs --prune`, review the diff, then run `pnpm i18n:build`.
