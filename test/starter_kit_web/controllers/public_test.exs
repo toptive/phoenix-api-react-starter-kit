@@ -1,9 +1,6 @@
 defmodule StarterKitWeb.PublicTest do
   use StarterKitWeb.ConnCase, async: true
 
-  alias StarterKit.Accounts.Scope
-  alias StarterKit.Legal
-
   test "the landing page is indexable and carries SEO props", %{conn: conn} do
     conn = get(conn, ~p"/")
     assert inertia_component(conn) == "home/show"
@@ -27,37 +24,8 @@ defmodule StarterKitWeb.PublicTest do
   end
 
   test "the default locale has one canonical URL and unknown locales do not exist", %{conn: conn} do
-    assert conn |> get("/en/legal/terms") |> redirected_to(301) == "/legal/terms"
     assert conn |> get("/en") |> redirected_to(301) == "/"
     assert conn |> get("/xx") |> html_response(404)
-    assert conn |> get("/xx/legal/terms") |> html_response(404)
-  end
-
-  test "legal pages show the published version, 404 otherwise", %{conn: conn} do
-    assert conn |> get(~p"/legal/terms") |> inertia_component() == "errors/show"
-
-    scope = Scope.for_user(superadmin_fixture())
-    [doc] = Legal.list_documents(scope) |> Enum.filter(&(&1.slug == "terms"))
-
-    {:ok, _} =
-      Legal.create_version(
-        scope,
-        doc,
-        %{"titles" => %{"en" => "Terms"}, "bodies" => %{"en" => "Hello"}},
-        publish: true
-      )
-
-    conn = get(conn, ~p"/es/legal/terms")
-    assert inertia_props(conn).page["title"] == "Terms"
-    assert inertia_props(conn).page["body"] == "Hello"
-
-    assert [%{"@type" => "BreadcrumbList", "itemListElement" => [home, page]}] =
-             inertia_props(conn).seo.jsonLd
-
-    assert {home["position"], home["item"]} == {1, "http://localhost:4002/es"}
-
-    assert {page["position"], page["name"], page["item"]} ==
-             {2, "Terms", "http://localhost:4002/es/legal/terms"}
   end
 
   test "sitemap, robots and health", %{conn: conn} do

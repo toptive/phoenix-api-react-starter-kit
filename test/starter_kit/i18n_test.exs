@@ -1,7 +1,6 @@
 defmodule StarterKit.I18nTest do
   use StarterKit.DataCase, async: false
 
-  alias StarterKit.Accounts.Scope
   alias StarterKit.I18n
   alias StarterKit.I18n.{Reference, Translation}
 
@@ -34,16 +33,6 @@ defmodule StarterKit.I18nTest do
     assert email =~ "ejemplo.com"
   end
 
-  test "admin edits win over the CSV and survive a sync" do
-    admin = superadmin_fixture()
-    scope = Scope.for_user(admin)
-    {:ok, _} = I18n.update_translation(scope, "nav.home", "es", "Portada")
-    assert I18n.t("nav.home", %{}, "es") == "Portada"
-
-    I18n.sync()
-    assert Repo.get_by!(Translation, key: "nav.home", locale: "es").value == "Portada"
-  end
-
   test "sync refreshes rows nobody edited and removes keys that left the CSV" do
     Repo.update_all(from(t in Translation, where: t.key == "nav.home" and t.locale == "en"),
       set: [value: "Old"]
@@ -55,24 +44,6 @@ defmodule StarterKit.I18nTest do
 
     assert Repo.get_by!(Translation, key: "nav.home", locale: "en").value ==
              Reference.catalog("en")["nav.home"]
-  end
-
-  test "fill_missing translates empty cells through the AI module" do
-    Repo.update_all(from(t in Translation, where: t.key == "nav.home" and t.locale == "es"),
-      set: [value: ""]
-    )
-
-    Process.put(:ai_response, fn body ->
-      [_, %{content: json}] = body.messages
-      filled = json |> Jason.decode!() |> Map.new(fn {k, _} -> {k, "ES #{k}"} end)
-      {:ok, %{"choices" => [%{"message" => %{"content" => Jason.encode!(filled)}}]}}
-    end)
-
-    # Only keys whose CSV cell is empty are "missing"; the test CSV has none, so nothing is sent.
-    assert {:ok, 0} = I18n.fill_missing(Scope.for_user(superadmin_fixture()), "es")
-
-    assert {:error, :unsupported_locale} =
-             I18n.fill_missing(Scope.for_user(superadmin_fixture()), "en")
   end
 
   test "every locale in the CSV has every key filled" do

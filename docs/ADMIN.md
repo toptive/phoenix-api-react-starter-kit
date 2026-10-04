@@ -1,44 +1,93 @@
 # Admin area
 
-`/admin`, superadmins only (`User.role == :superadmin`, not while impersonating). Everyone else
-gets a 404. Grant the role in Admin → Users → a user → Role.
+All `/api/v1/admin/` endpoints require a live bearer for a global superadmin, outside
+impersonation. Anonymous, ordinary, expired and impersonating callers receive 404. Each action
+also authorizes through the existing schema policy. Inputs are flat camelCase JSON; results use
+the API envelopes and generated serializers.
 
 ## First superadmin
 
-A new installation has no superadmin. Make one with the bootstrap task: it promotes the account
-with that email, or creates a confirmed one without a password. The person then signs in with a
-magic link (or Google). It is refused once any superadmin exists, so it cannot take over a
-running installation (`Accounts.bootstrap_superadmin/1`, audited as `user.superadmin_bootstrapped`).
+`Accounts.bootstrap_superadmin/1` promotes an existing account or creates a confirmed account
+without a password. It refuses once any superadmin exists and records
+`user.superadmin_bootstrapped`. The account can sign in with a magic link or Google.
 
 ```sh
-mix starter_kit.admin.bootstrap you@example.com                      # dev, staging
-kamal app exec 'bin/starter_kit eval "StarterKit.Release.bootstrap_admin(\"you@example.com\")"'   # production
+mix starter_kit.admin.bootstrap you@example.com
 ```
 
-| Section | Path | What it does |
+For production, use the release bootstrap command described in [DEPLOY.md](DEPLOY.md).
+
+## Resources
+
+| Method | Resource under `/api/v1/admin` | Result |
 |---|---|---|
-| Overview | `/admin` | counts and entry points |
-| Users | `/admin/users` | search, see organizations, change global role, act as a user (reason required) |
-| Organizations | `/admin/organizations` | search, member list |
-| Texts | `/admin/translations` | edit every UI text per locale, LLM fill ([I18N.md](I18N.md)) |
-| Legal documents | `/admin/legal-documents` | terms, privacy, cookies: versions and publishing |
-| Audit log | `/admin/audit-events` | append-only events; search by record id or action |
-| Background jobs | `/admin/oban` | Oban Web (open source) |
+| GET | `/dashboard` | `AdminStats` user and organization counts |
+| GET | `/users` | Paginated `User[]`; `q` searches email/name, newest first |
+| GET | `/users/:id` | `AdminUserDetail` user and their organizations |
+| PUT | `/users/:id` | `User`; `role` is `user` or `superadmin`, audits `user.role_changed` |
+| POST | `/users/:id/impersonation` | 201 `AuthSession`; reason is 5..255 characters |
+| GET | `/organizations` | Paginated `AdminOrganization[]`, name search and member counts |
+| GET | `/organizations/:id` | `AdminOrganizationDetail`, memberships with users |
+| GET | `/translations` | Paginated `TranslationEntry[]`; `q`, `missing=<locale>` |
+| PUT | `/translations/:key` | `TranslationEntry`; locale/value, max 20,000 characters |
+| POST | `/translation-fills` | 201 `TranslationFill`; locale, synchronous AI fill |
+| GET | `/legal-documents` | `LegalDocument[]`, ensures terms/privacy/cookies exist |
+| GET | `/legal-documents/:slug` | `LegalDocument`, versions newest first |
+| POST | `/legal-documents/:slug/versions` | 201 `LegalDocumentVersion`, optional publish |
+| POST | `/legal-documents/:slug/versions/:number/publication` | 201 `LegalDocument`, idempotent |
+| GET | `/audit-events` | Paginated `AuditEvent[]`, UUID or action search |
+| POST | `/jobs-access` | Empty 204 and a five-minute signed jobs cookie |
 
-## Legal documents (`StarterKit.Legal`)
+Paginated responses put `page`, `perPage`, `total`, and `totalPages` under `meta.pagination`.
+Queries accept `page` and `perPage` (default 25, maximum 100). Text editing and sync are described
+in [I18N.md](I18N.md).
 
-- Three documents: `terms`, `privacy`, `cookies`; each has numbered, immutable versions with a
-  title and a body per locale (English required) and an internal note.
-- "Save as draft" adds a version; "Publish" makes it the one the public page shows
-  (`/legal/:slug`, `/es/legal/:slug`). Old versions stay.
-- Bodies are plain text: blank lines separate paragraphs, `## ` starts a heading. They are never
-  rendered as HTML.
-- `Legal.accept(scope, slug, ip)` records which exact version a user accepted (for products
-  that need explicit consent).
+## Impersonation
 
-## Audit log (`StarterKit.Audit`)
+The target must be an ordinary user, never the administrator or another superadmin. Refusal is
+403 `forbidden`. Creation atomically inserts the existing `Accounts.Impersonation` record and
+an eight-hour bearer session tied to the originating administrator session. It has no sudo
+window and its expiry never slides. `impersonation.started` records reason and impersonation id.
 
-`Audit.record("organization.updated", scope: scope, subject: org, metadata: %{…})` from the
-context. The database rejects UPDATE and DELETE on `audit_events` (trigger). Recorded today:
-registrations, deletions, role changes, organization and membership changes, invitations,
-translation edits, legal versions and publications, impersonation start/stop.
+The SPA saves its original admin token separately and uses the returned target token. Bootstrap
+shows the target and `auth.impersonator`, with `superadmin: false`. Writes record both actors.
+`DELETE /api/v1/auth/impersonation` revokes the target session, ends the record and audits
+`impersonation.stopped`; the SPA restores its saved admin token. Signing out while impersonating
+revokes both sessions. See [AUTH.md](AUTH.md).
+
+## Legal documents
+
+`StarterKit.Legal` retains numbered, immutable versions. Creation accepts `titles` and `bodies`
+as locale maps, with non-empty English required, optional `note` (max 255), and optional boolean
+`publish`. Field errors use `validation.english_required`. Creation records
+`legal.version_created`; publishing records `legal.published`. Saving and publishing happen in
+one transaction. Publishing an already current version leaves the timestamp and audit log intact.
+
+`GET /api/v1/legal-pages/:slug` returns the published `LegalPage` in the request locale, falling
+back to English separately for title and body. Unknown or unpublished documents return 404.
+Bodies are plain text: blank lines separate paragraphs and `## ` starts a heading. The client
+renders text safely. Responses use `Cache-Control: public, no-cache` and the strong ETag
+`"<slug>:<number>:<locale>"`; matching conditional requests return an empty 304.
+`Legal.accept(scope, slug, ip)` retains consent to the exact version, including after deletion.
+
+## Audit log
+
+Contexts call `Audit.record/2` for sensitive changes. The append-only database trigger rejects
+UPDATE/DELETE. The viewer returns newest events first, resolves actor email once per page, and
+keeps metadata keys verbatim. A UUID query matches subject or actor id; other queries search the
+action case-insensitively. Missing/deleted actors have a null email.
+
+## Oban Web
+
+The dashboard and its assets live under `/admin/jobs`, separate from the SPA. After a bearer
+request to `POST /api/v1/admin/jobs-access`, the browser opens `/admin/jobs` on the API origin.
+The API sets `_starter_kit_jobs`: signed, HttpOnly, SameSite Strict, restricted to `/admin/jobs`,
+Secure on production HTTPS, with a five-minute lifetime. It contains the originating session id;
+it never contains the bearer. Cookies do not authenticate the JSON API.
+
+`StarterKitWeb.JobsAccess` verifies signature, age, bearer-session expiry/revocation, current
+superadmin role and absence of impersonation on every dashboard/asset request and LiveView
+mount. Connected sockets recheck on events, navigation and once per second, so grants stop
+working after expiry, demotion or logout. Phoenix's browser session supports LiveView CSRF only;
+a browser login session cannot grant jobs access. Oban receives the per-request CSP nonce.
+After expiry, request a new grant through the API and reopen the dashboard.

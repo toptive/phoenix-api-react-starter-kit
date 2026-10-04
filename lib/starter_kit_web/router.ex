@@ -12,6 +12,9 @@ defmodule StarterKitWeb.Router do
 
   alias StarterKitWeb.Plugs
 
+  defp require_api_superadmin(conn, opts),
+    do: Plugs.BearerAuth.require_superadmin(conn, opts)
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -64,10 +67,17 @@ defmodule StarterKitWeb.Router do
     plug Plugs.VerifyAuthorized
   end
 
-  pipeline :superadmin do
-    plug :require_authenticated_user
-    plug :require_superadmin
-    plug Plugs.VerifyAuthorized
+  pipeline :api_superadmin do
+    plug :require_api_superadmin
+  end
+
+  pipeline :jobs_browser do
+    plug :accepts, ["html"]
+    plug :fetch_session
+    plug StarterKitWeb.JobsAccess
+    plug :fetch_live_flash
+    plug :protect_from_forgery
+    plug Plugs.SecurityHeaders
   end
 
   pipeline :localized do
@@ -107,7 +117,6 @@ defmodule StarterKitWeb.Router do
     pipe_through [:public, :browser, :page_views]
 
     get "/", HomeController, :show
-    get "/legal/:slug", LegalPageController, :show
   end
 
   # Signed-in app.
@@ -131,33 +140,34 @@ defmodule StarterKitWeb.Router do
     end
   end
 
-  # Superadmin area.
-  scope "/admin", StarterKitWeb.Admin, as: :admin do
-    pipe_through [:browser, :superadmin]
+  scope "/admin" do
+    pipe_through :jobs_browser
 
-    get "/", DashboardController, :show
-
-    resources "/users", UserController, only: [:index, :show, :update] do
-      resources "/impersonation", ImpersonationController, only: [:create], singleton: true
-    end
-
-    resources "/organizations", OrganizationController, only: [:index, :show]
-    resources "/translations", TranslationController, only: [:index, :update], param: "key"
-    resources "/translation-fills", TranslationFillController, only: [:create]
-
-    resources "/legal-documents", LegalDocumentController, only: [:index, :show], param: "slug" do
-      resources "/versions", LegalDocumentVersionController, only: [:create], param: "number" do
-        resources "/publication", LegalPublicationController, only: [:create], singleton: true
-      end
-    end
-
-    resources "/audit-events", AuditEventController, only: [:index]
+    oban_dashboard("/jobs",
+      csp_nonce_assign_key: :csp_nonce,
+      resolver: StarterKitWeb.JobsAccess,
+      on_mount: [StarterKitWeb.JobsAccess]
+    )
   end
 
-  scope "/admin" do
-    pipe_through [:browser, :superadmin]
-
-    oban_dashboard("/oban", csp_nonce_assign_key: :csp_nonce)
+  scope "/api/v1/admin", StarterKitWeb.Api.V1.Admin, as: :api_v1_admin do
+    pipe_through [:api, :api_superadmin]
+    get "/dashboard", DashboardController, :show
+    get "/users", UserController, :index
+    get "/users/:id", UserController, :show
+    put "/users/:id", UserController, :update
+    post "/users/:id/impersonation", ImpersonationController, :create
+    get "/organizations", OrganizationController, :index
+    get "/organizations/:id", OrganizationController, :show
+    get "/translations", TranslationController, :index
+    put "/translations/:key", TranslationController, :update
+    post "/translation-fills", TranslationFillController, :create
+    get "/legal-documents", LegalDocumentController, :index
+    get "/legal-documents/:slug", LegalDocumentController, :show
+    post "/legal-documents/:slug/versions", LegalDocumentVersionController, :create
+    post "/legal-documents/:slug/versions/:number/publication", LegalPublicationController, :create
+    get "/audit-events", AuditEventController, :index
+    post "/jobs-access", JobsAccessController, :create
   end
 
   # Signed webhooks from other services: no session, no CSRF; each controller verifies
@@ -173,6 +183,7 @@ defmodule StarterKitWeb.Router do
 
     get "/bootstrap", BootstrapController, :show
     get "/locales/:locale", LocaleController, :show
+    get "/legal-pages/:slug", LegalPageController, :show
 
     scope "/auth", Auth, as: :auth do
       post "/sessions", SessionController, :create
@@ -244,7 +255,7 @@ defmodule StarterKitWeb.Router do
     resources "/direct-uploads", DirectUploadController, only: [:create]
   end
 
-  # Localized public pages: /es, /es/legal/terms… Last on purpose: "/:locale" matches
+  # Localized landing pages: /es… Last on purpose: "/:locale" matches
   # any single segment, so every other route must be tried first. PathLocale answers
   # 404 for an unknown locale and redirects the default locale to the unprefixed URL.
   # The frontend fills :locale through typelizer URL defaults (setUrlDefaults).
@@ -252,7 +263,6 @@ defmodule StarterKitWeb.Router do
     pipe_through [:localized, :public, :browser, :page_views]
 
     get "/", HomeController, :show
-    get "/legal/:slug", LegalPageController, :show
   end
 
   if Application.compile_env(:starter_kit, :dev_routes) do

@@ -37,7 +37,9 @@ defmodule StarterKitWeb.Plugs.BearerAuth do
       |> assign(:api_token, token)
     else
       {:error, :session_expired} ->
-        conn |> Responses.render_error(401, :session_expired) |> halt()
+        if String.starts_with?(conn.request_path, "/api/v1/admin/"),
+          do: conn |> Responses.render_error(404, :not_found) |> halt(),
+          else: conn |> Responses.render_error(401, :session_expired) |> halt()
 
       _ ->
         conn |> assign(:current_user, nil) |> assign(:current_scope, nil) |> assign(:api_token, nil)

@@ -9,6 +9,8 @@ defmodule StarterKit.Organizations.OrganizationPolicy do
   @impl true
   def authorize(%Scope{} = scope, :index, Organization), do: Scope.superadmin?(scope)
 
+  def authorize(%Scope{} = scope, :show, Organization), do: Scope.superadmin?(scope)
+
   def authorize(%Scope{} = scope, :show, %Organization{id: id}),
     do: Scope.organization_id(scope) == id or Scope.superadmin?(scope)
 

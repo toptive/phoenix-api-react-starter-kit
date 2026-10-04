@@ -146,7 +146,7 @@ config :typelizer,
     pages: nil
   ],
   # Oban Web: keep its entry page, skip its asset routes.
-  routes: [exclude: ["/dev", "/live", ~r{^/admin/oban/}E], defaults: [:locale]]
+  routes: [exclude: ["/dev", "/live", ~r{^/admin/jobs/}E], defaults: [:locale]]
 
 config :logger, :default_formatter,
   format: "$time $metadata[$level] $message\n",

@@ -2,6 +2,9 @@
 
 export type { AccountDeletion } from "./AccountDeletion";
 export type { AdminOrganization } from "./AdminOrganization";
+export type { AdminOrganizationDetail } from "./AdminOrganizationDetail";
+export type { AdminStats } from "./AdminStats";
+export type { AdminUserDetail } from "./AdminUserDetail";
 export type { AppConfig } from "./AppConfig";
 export type { AuditEvent } from "./AuditEvent";
 export type { Auth } from "./Auth";
@@ -29,6 +32,7 @@ export type { Session } from "./Session";
 export type { Subscription } from "./Subscription";
 export type { SudoWindow } from "./SudoWindow";
 export type { TranslationEntry } from "./TranslationEntry";
+export type { TranslationFill } from "./TranslationFill";
 export type { TranslationValue } from "./TranslationValue";
 export type { Turnstile } from "./Turnstile";
 export type { User } from "./User";

@@ -53,13 +53,23 @@ defmodule StarterKit.Legal do
   @doc "All documents with their versions (admin), creating missing slugs on the fly."
   def list_documents(_scope) do
     ensure_documents()
-    Repo.all(from d in LegalDocument, order_by: d.slug, preload: [:versions])
+
+    Repo.all(
+      from d in LegalDocument,
+        order_by: d.slug,
+        preload: [versions: ^from(v in LegalDocumentVersion, order_by: [desc: v.number])]
+    )
   end
 
   @doc "A document by slug, with versions (admin)."
   def get_document!(_scope, slug) do
     ensure_documents()
-    Repo.one!(from d in LegalDocument, where: d.slug == ^slug, preload: [:versions])
+
+    Repo.one!(
+      from d in LegalDocument,
+        where: d.slug == ^slug,
+        preload: [versions: ^from(v in LegalDocumentVersion, order_by: [desc: v.number])]
+    )
   end
 
   defp ensure_documents do
@@ -73,6 +83,34 @@ defmodule StarterKit.Legal do
     )
   end
 
+  @doc "Creates a version from a flat API request with a validated publish flag."
+  def create_document_version(scope, slug, attrs) do
+    document = get_document!(scope, slug)
+    changeset = {%{}, %{publish: :boolean}} |> Ecto.Changeset.cast(attrs, [:publish])
+
+    with {:ok, values} <- Ecto.Changeset.apply_action(changeset, :insert) do
+      create_version(scope, document, Map.take(attrs, ["titles", "bodies", "note"]),
+        publish: values[:publish] || false
+      )
+    end
+  end
+
+  @doc "Publishes a numbered version and returns the document."
+  def publish_document_version(scope, slug, number) do
+    document = get_document!(scope, slug)
+
+    case Integer.parse(to_string(number)) do
+      {number, ""} when number > 0 ->
+        version = get_version!(document, number)
+
+        with {:ok, _} <- publish_version(scope, document, version),
+             do: {:ok, get_document!(scope, slug)}
+
+      _ ->
+        {:error, :not_found}
+    end
+  end
+
   @doc "A changeset for the version form."
   def change_version(attrs \\ %{}),
     do: LegalDocumentVersion.changeset(%LegalDocumentVersion{}, attrs)
@@ -82,6 +120,8 @@ defmodule StarterKit.Legal do
   """
   def create_version(scope, %LegalDocument{} = document, attrs, opts \\ []) do
     Repo.transact(fn ->
+      Repo.one!(from d in LegalDocument, where: d.id == ^document.id, lock: "FOR UPDATE")
+
       number =
         (Repo.one(
            from v in LegalDocumentVersion,
@@ -103,34 +143,44 @@ defmodule StarterKit.Legal do
   end
 
   defp after_create(scope, document, version, publish?) do
-    Audit.record("legal.version_created",
-      scope: scope,
-      subject: version,
-      metadata: %{slug: document.slug, number: version.number}
-    )
-
-    if publish?, do: publish_version(scope, document, version), else: {:ok, version}
+    with {:ok, _} <-
+           Audit.record("legal.version_created",
+             scope: scope,
+             subject: version,
+             metadata: %{slug: document.slug, number: version.number}
+           ) do
+      if publish?, do: publish_version(scope, document, version), else: {:ok, version}
+    end
   end
 
   @doc "Makes `version` the public one (audited)."
   def publish_version(scope, %LegalDocument{} = document, %LegalDocumentVersion{} = version) do
-    now = DateTime.utc_now(:second)
-
     Repo.transact(fn ->
-      {:ok, version} =
-        version |> Ecto.Changeset.change(published_at: version.published_at || now) |> Repo.update()
+      document = Repo.one!(from d in LegalDocument, where: d.id == ^document.id, lock: "FOR UPDATE")
 
-      {:ok, _} =
-        document |> Ecto.Changeset.change(published_version_id: version.id) |> Repo.update()
-
-      Audit.record("legal.version_published",
-        scope: scope,
-        subject: version,
-        metadata: %{slug: document.slug, number: version.number}
-      )
-
-      {:ok, version}
+      if document.published_version_id == version.id do
+        {:ok, Repo.reload!(version)}
+      else
+        publish_changed_version(scope, document, version)
+      end
     end)
+  end
+
+  defp publish_changed_version(scope, document, version) do
+    with {:ok, published} <-
+           version
+           |> Ecto.Changeset.change(published_at: DateTime.utc_now(:second))
+           |> Repo.update(),
+         {:ok, _} <-
+           document |> Ecto.Changeset.change(published_version_id: version.id) |> Repo.update(),
+         {:ok, _} <-
+           Audit.record("legal.published",
+             scope: scope,
+             subject: published,
+             metadata: %{slug: document.slug, number: version.number}
+           ) do
+      {:ok, published}
+    end
   end
 
   @doc "Gets a version of a document (admin)."

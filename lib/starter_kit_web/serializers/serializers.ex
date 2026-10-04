@@ -80,7 +80,12 @@ defmodule StarterKitWeb.Serializers.TranslationEntrySerializer do
   use Typelizer.Serializer
 
   attribute :key, type: :string
-  has_many :values, serializer: StarterKitWeb.Serializers.TranslationValueSerializer
+
+  has_many :values,
+    serializer: StarterKitWeb.Serializers.TranslationValueSerializer,
+    value: fn entry ->
+      Enum.map(StarterKit.I18n.locales(), &Map.put(entry.values[&1], :locale, &1))
+    end
 end
 
 defmodule StarterKitWeb.Serializers.AuditEventSerializer do

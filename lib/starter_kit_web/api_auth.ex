@@ -153,6 +153,9 @@ defmodule StarterKitWeb.ApiAuth do
       when reason in [:transfer_ownership, :subscription_active],
       do: Responses.render_error(conn, 409, reason, %{organization: organization})
 
+  def error(conn, reason) when reason in [:ai_not_configured, :ai_unavailable],
+    do: Responses.render_error(conn, 503, reason)
+
   def error(conn, reason) do
     status =
       case reason do

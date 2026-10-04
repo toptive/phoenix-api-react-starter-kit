@@ -583,6 +583,51 @@ defmodule StarterKit.Accounts do
     end
   end
 
+  @doc "A live, ordinary superadmin session for the jobs dashboard."
+  def jobs_admin(session_id) do
+    with {:ok, id} <- Ecto.UUID.cast(session_id),
+         %Session{revoked_at: nil, impersonator_user_id: nil} = session <-
+           Repo.get(Session, id) |> Repo.preload(:user),
+         true <- DateTime.after?(session.expires_at, now()),
+         %User{role: :superadmin} = user <- session.user do
+      {:ok, user}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  @doc "An admin-visible user, accepting only UUID identifiers."
+  def admin_user(scope, id) do
+    with {:ok, id} <- Ecto.UUID.cast(id),
+         %User{} = user <- scope |> UserPolicy.scope(User) |> Repo.get(id) do
+      {:ok, user}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  @doc "Updates the global role from an admin API request."
+  def admin_update_user(scope, id, attrs) do
+    with {:ok, user} <- admin_user(scope, id) do
+      update_user_role(scope, user, Map.put_new(attrs, "role", nil))
+    end
+  end
+
+  @doc "Starts an audited impersonation and its eight-hour bearer session atomically."
+  def start_api_impersonation(scope, id, attrs, device) do
+    Repo.transact(fn ->
+      with {:ok, target} <- admin_user(scope, id),
+           {:ok, impersonation} <- start_impersonation(scope, target, attrs) do
+        {:ok,
+         generate_api_token(target, device,
+           impersonator_user_id: scope.user.id,
+           impersonator_session_id: scope.session.id,
+           impersonation_id: impersonation.id
+         )}
+      end
+    end)
+  end
+
   ## Administration (superadmin)
 
   @doc "Lists users for the admin area (search by email or name)."
@@ -605,15 +650,17 @@ defmodule StarterKit.Accounts do
 
   @doc "Changes a user's global role (superadmin only; audited)."
   def update_user_role(%Scope{} = scope, %User{} = user, attrs) do
-    with {:ok, updated} <- user |> User.role_changeset(attrs) |> Repo.update() do
-      Audit.record("user.role_changed",
-        scope: scope,
-        subject: updated,
-        metadata: %{from: user.role, to: updated.role}
-      )
-
-      {:ok, updated}
-    end
+    Repo.transact(fn ->
+      with {:ok, updated} <- user |> User.role_changeset(attrs) |> Repo.update(),
+           {:ok, _} <-
+             Audit.record("user.role_changed",
+               scope: scope,
+               subject: updated,
+               metadata: %{from: user.role, to: updated.role}
+             ) do
+        {:ok, updated}
+      end
+    end)
   end
 
   @doc """
@@ -629,20 +676,22 @@ defmodule StarterKit.Accounts do
         {:error, :forbidden}
 
       true ->
-        %Impersonation{admin_id: admin.id, target_user_id: target.id}
-        |> Impersonation.changeset(attrs)
-        |> Repo.insert()
-        |> tap(fn
-          {:ok, imp} ->
-            Audit.record("impersonation.started",
-              scope: scope,
-              subject: target,
-              metadata: %{reason: imp.reason, impersonation_id: imp.id}
-            )
+        Repo.transact(fn -> insert_impersonation(scope, admin, target, attrs) end)
+    end
+  end
 
-          _ ->
-            :ok
-        end)
+  defp insert_impersonation(scope, admin, target, attrs) do
+    with {:ok, imp} <-
+           %Impersonation{admin_id: admin.id, target_user_id: target.id}
+           |> Impersonation.changeset(attrs)
+           |> Repo.insert(),
+         {:ok, _} <-
+           Audit.record("impersonation.started",
+             scope: scope,
+             subject: target,
+             metadata: %{"reason" => imp.reason, "impersonationId" => imp.id}
+           ) do
+      {:ok, imp}
     end
   end
 

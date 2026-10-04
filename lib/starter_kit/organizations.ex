@@ -222,6 +222,27 @@ defmodule StarterKit.Organizations do
     Repo.paginate(query, params, skip_org_id: true)
   end
 
+  @doc "Admin dashboard counts."
+  def admin_stats, do: %{users: Accounts.count_users(), organizations: count_organizations()}
+
+  @doc "A user and all their organizations for the admin detail."
+  def admin_user_detail(scope, id) do
+    with {:ok, user} <- Accounts.admin_user(scope, id) do
+      {:ok, %{user: user, organizations: list_user_organizations(Scope.for_user(user))}}
+    end
+  end
+
+  @doc "An admin organization detail, with explicitly scoped memberships."
+  def admin_organization_detail(scope, id) do
+    with true <- Scope.superadmin?(scope),
+         {:ok, id} <- Ecto.UUID.cast(id),
+         %Organization{} = organization <- Repo.get(Organization, id) do
+      {:ok, %{organization: organization, memberships: list_organization_memberships(organization)}}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
   ## Memberships
 
   @doc "Members of the current organization, with their users."

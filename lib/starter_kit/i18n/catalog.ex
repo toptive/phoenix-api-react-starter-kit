@@ -3,7 +3,7 @@ defmodule StarterKit.I18n.Catalog do
   Holds the runtime catalogue (compiled CSV reference overlaid with DB rows) in
   `:persistent_term`, one flat map per locale, plus a version string for caching.
 
-  Reloads when any node broadcasts `:reload` on the `"i18n"` PubSub topic (an admin edit
+  Reloads when any node broadcasts `{:reload, version}` on the `"i18n"` PubSub topic (an admin edit
   or a sync). `:persistent_term` makes reads free; writes are rare (admin edits).
   """
 
@@ -28,10 +28,11 @@ defmodule StarterKit.I18n.Catalog do
 
   @doc "Rebuilds the catalogue on every node."
   def broadcast_reload do
-    # Tests reload in the calling process (it owns the SQL sandbox connection).
-    if Application.get_env(:starter_kit, :i18n_inline_reload, false),
-      do: load(),
-      else: Phoenix.PubSub.broadcast(StarterKit.PubSub, @topic, :reload)
+    version = Ecto.UUID.generate()
+    load(version)
+
+    unless Application.get_env(:starter_kit, :i18n_inline_reload, false),
+      do: Phoenix.PubSub.broadcast(StarterKit.PubSub, @topic, {:reload, version})
   end
 
   @doc false
@@ -58,15 +59,20 @@ defmodule StarterKit.I18n.Catalog do
   end
 
   @impl true
-  def handle_info(:reload, state) do
-    load()
+  def handle_info({:reload, version}, state) do
+    load(version)
     {:noreply, state}
   end
 
-  defp load do
+  defp load(reload_version \\ nil) do
     overrides =
       try do
-        Repo.all(from t in Translation, where: t.value != "", select: {t.locale, t.key, t.value})
+        Repo.all(
+          from t in Translation,
+            where: t.edited or t.value != "",
+            order_by: [t.locale, t.key],
+            select: {t.locale, t.key, t.value, t.updated_at}
+        )
       rescue
         # The table may not exist yet (first boot before migrations): use the reference.
         _ in [Postgrex.Error, DBConnection.ConnectionError] -> []
@@ -84,6 +90,6 @@ defmodule StarterKit.I18n.Catalog do
       |> Base.url_encode64(padding: false)
       |> binary_part(0, 12)
 
-    :persistent_term.put({__MODULE__, :version}, version)
+    :persistent_term.put({__MODULE__, :version}, reload_version || version)
   end
 end

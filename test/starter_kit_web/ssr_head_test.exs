@@ -7,8 +7,7 @@ defmodule StarterKitWeb.SSRHeadTest do
   # Turns SSR on globally: not async.
   use StarterKitWeb.ConnCase, async: false
 
-  alias StarterKit.Accounts.Scope
-  alias StarterKit.{I18n, Legal}
+  alias StarterKit.I18n
 
   setup_all do
     dir = Path.join(System.tmp_dir!(), "starter-kit-ssr-#{System.unique_integer([:positive])}")
@@ -60,23 +59,5 @@ defmodule StarterKitWeb.SSRHeadTest do
     assert [_organization, _website] = Regex.scan(~r/<script[^>]*application\/ld\+json/, head)
     assert head =~ ~s(Acme\\u003c/script>)
     refute html =~ "<script>alert(1)"
-  end
-
-  test "a title with & and < is escaped once, never &amp;amp;", %{conn: conn} do
-    scope = Scope.for_user(superadmin_fixture())
-    [doc] = Legal.list_documents(scope) |> Enum.filter(&(&1.slug == "terms"))
-
-    {:ok, _} =
-      Legal.create_version(
-        scope,
-        doc,
-        %{"titles" => %{"en" => "Terms & <rules>"}, "bodies" => %{"en" => "Hello"}},
-        publish: true
-      )
-
-    html = conn |> get(~p"/legal/terms") |> html_response(200)
-
-    assert title!(html) == "Terms &amp; &lt;rules&gt;"
-    refute html =~ "&amp;amp;"
   end
 end

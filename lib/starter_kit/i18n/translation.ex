@@ -19,7 +19,7 @@ defmodule StarterKit.I18n.Translation do
   @doc false
   def edit_changeset(translation, attrs) do
     translation
-    |> cast(attrs, [:value])
+    |> cast(attrs, [:value], empty_values: [])
     |> validate_length(:value, max: 20_000)
     |> put_change(:edited, true)
   end

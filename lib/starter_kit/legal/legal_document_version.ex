@@ -23,9 +23,10 @@ defmodule StarterKit.Legal.LegalDocumentVersion do
   def changeset(version, attrs) do
     version
     |> cast(attrs, [:titles, :bodies, :note])
-    |> validate_required([:titles, :bodies])
     |> validate_english(:titles)
     |> validate_english(:bodies)
+    |> validate_locale_values(:titles)
+    |> validate_locale_values(:bodies)
     |> validate_length(:note, max: 255)
     |> unique_constraint([:legal_document_id, :number])
   end
@@ -34,6 +35,18 @@ defmodule StarterKit.Legal.LegalDocumentVersion do
     case get_field(changeset, field) do
       %{"en" => value} when is_binary(value) and value != "" -> changeset
       _ -> add_error(changeset, field, "validation.english_required")
+    end
+  end
+
+  defp validate_locale_values(changeset, field) do
+    case get_field(changeset, field) do
+      values when is_map(values) ->
+        if Enum.all?(Map.values(values), &is_binary/1),
+          do: changeset,
+          else: add_error(changeset, field, "validation.invalid")
+
+      _ ->
+        changeset
     end
   end
 

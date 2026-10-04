@@ -13,8 +13,8 @@ defmodule StarterKitWeb.Plugs.ErrorResponsesTest do
     assert conn.resp_body =~ ~s(<meta name="robots" content="noindex")
   end
 
-  test "an Inertia error page (a missing record) is noindex and not cached", %{conn: conn} do
-    conn = get(conn, ~p"/legal/no-such-document")
+  test "an API legal error (a missing document) is noindex and not cached", %{conn: conn} do
+    conn = get(conn, ~p"/api/v1/legal-pages/no-such-document")
 
     assert conn.status == 404
     assert no_index_no_store?(conn.resp_headers)

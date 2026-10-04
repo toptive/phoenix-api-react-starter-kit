@@ -3,9 +3,9 @@
 import { buildUrl, type RouteDefinition, type RouteOptions } from "./runtime";
 
 export const webDashboard = {
-  /** GET /admin/oban */
+  /** GET /admin/jobs */
   home: (options?: RouteOptions): RouteDefinition<"get"> => ({
-    url: buildUrl("/admin/oban", {}, options),
+    url: buildUrl("/admin/jobs", {}, options),
     method: "get",
   }),
 } as const;

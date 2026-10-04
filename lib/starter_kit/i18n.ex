@@ -179,6 +179,7 @@ defmodule StarterKit.I18n do
     keys = Enum.uniq(Enum.map(Reference.rows(), &elem(&1, 0)) ++ Enum.map(rows, &elem(&1, 0)))
     reference = Map.new(Reference.rows())
     q = params |> Map.get("q", "") |> String.downcase() |> String.trim()
+    exact_key = params["key"]
     missing = supported_locale(params["missing"])
 
     entries =
@@ -196,8 +197,9 @@ defmodule StarterKit.I18n do
         %{key: key, values: values}
       end)
       |> Enum.filter(fn entry ->
-        (q == "" or String.contains?(entry.key, q) or
-           Enum.any?(entry.values, fn {_, v} -> String.contains?(String.downcase(v.value), q) end)) and
+        (is_nil(exact_key) or entry.key == exact_key) and
+          (q == "" or String.contains?(String.downcase(entry.key), q) or
+             Enum.any?(entry.values, fn {_, v} -> String.contains?(String.downcase(v.value), q) end)) and
           (is_nil(missing) or entry.values[missing].value == "")
       end)
 
@@ -205,15 +207,10 @@ defmodule StarterKit.I18n do
   end
 
   defp paginate_list(entries, params) do
-    per_page = 50
+    per_page = parse_page(params["per_page"], 25) |> max(1) |> min(100)
     total = length(entries)
     total_pages = max(1, div(total + per_page - 1, per_page))
-
-    page =
-      case Integer.parse(to_string(params["page"] || "1")) do
-        {n, _} -> n |> max(1) |> min(total_pages)
-        :error -> 1
-      end
+    page = parse_page(params["page"], 1) |> max(1) |> min(1_000_000)
 
     %{
       entries: Enum.slice(entries, (page - 1) * per_page, per_page),
@@ -222,6 +219,13 @@ defmodule StarterKit.I18n do
       total: total,
       total_pages: total_pages
     }
+  end
+
+  defp parse_page(value, default) do
+    case Integer.parse(to_string(value)) do
+      {n, ""} -> n
+      _ -> default
+    end
   end
 
   @doc "Sets the value of `key` in `locale` (marks it edited, audited, reloads every node)."
@@ -238,17 +242,30 @@ defmodule StarterKit.I18n do
         |> Translation.edit_changeset(%{value: value})
         |> Ecto.Changeset.put_change(:edited_by_id, scope.user.id)
 
-      with {:ok, saved} <- Repo.insert_or_update(changeset) do
-        Audit.record("translation.updated",
-          scope: scope,
-          subject: saved,
-          metadata: %{key: key, locale: locale}
-        )
-
-        Catalog.broadcast_reload()
-        {:ok, saved}
-      end
+      Repo.transact(fn -> save_translation(scope, changeset, key, locale) end)
+      |> reload_on_success()
     end
+  end
+
+  defp save_translation(scope, changeset, key, locale) do
+    with {:ok, saved} <- Repo.insert_or_update(changeset),
+         {:ok, _} <-
+           Audit.record("translation.updated",
+             scope: scope,
+             subject: saved,
+             metadata: %{key: key, locale: locale}
+           ) do
+      {:ok, saved}
+    end
+  end
+
+  defp reload_on_success(result) do
+    case result do
+      {:ok, _} -> Catalog.broadcast_reload()
+      _ -> :ok
+    end
+
+    result
   end
 
   @doc """
@@ -256,43 +273,131 @@ defmodule StarterKit.I18n do
   Filled rows count as edited. Returns `{:ok, filled_count}`.
   """
   def fill_missing(scope, locale) do
-    with locale when is_binary(locale) <- supported_locale(locale),
-         false <- locale == default_locale() do
-      source = catalog(default_locale())
-
-      filled =
-        locale
-        |> missing_keys()
-        |> Enum.chunk_every(40)
-        |> Enum.flat_map(&machine_translate(&1, source, locale))
-
-      Enum.each(filled, fn {key, value} -> update_translation(scope, key, locale, value) end)
-      {:ok, length(filled)}
-    else
-      _ -> {:error, :unsupported_locale}
+    with true <- locale in locales() || {:error, :unsupported_locale},
+         true <- AI.configured?() || {:error, :ai_not_configured} do
+      translate_batches(scope, locale)
     end
   end
 
-  defp machine_translate(batch, source, locale) do
-    pairs = Map.new(batch, &{&1, source[&1]})
+  defp translate_batches(scope, locale) do
+    source = catalog(default_locale())
+    batches = list_translations(scope, %{"missing" => locale, "per_page" => "100"})
+
+    keys =
+      for page <- 1..batches.total_pages,
+          entry <-
+            list_translations(scope, %{
+              "missing" => locale,
+              "per_page" => "100",
+              "page" => to_string(page)
+            }).entries,
+          do: entry.key
+
+    result =
+      Enum.reduce_while(
+        Enum.chunk_every(keys, 40),
+        {:ok, %{}},
+        &translate_batch(&1, &2, source, locale)
+      )
+
+    with {:ok, translated} <- result do
+      Repo.transact(fn -> persist_fill(scope, locale, translated) end) |> reload_on_success()
+    end
+  end
+
+  defp translate_batch(batch, {:ok, acc}, source, locale) do
+    pairs = Map.new(batch, &{&1, source[&1] || &1})
 
     case AI.translate_strings(pairs, from: default_locale(), to: locale) do
-      {:ok, translated} -> Enum.filter(translated, fn {k, v} -> k in batch and v != "" end)
-      {:error, _} -> []
+      {:ok, translated} ->
+        valid = Map.filter(translated, fn {key, value} -> key in batch and value != "" end)
+        {:cont, {:ok, Map.merge(acc, valid)}}
+
+      {:error, _} ->
+        {:halt, {:error, :ai_unavailable}}
     end
   end
 
-  defp missing_keys(locale) do
-    db =
-      Repo.all(from t in Translation, where: t.locale == ^locale and t.value != "", select: t.key)
+  defp persist_fill(scope, locale, translated) do
+    with {:ok, count} <- save_translations(scope, locale, translated),
+         {:ok, _} <-
+           Audit.record("translation.filled",
+             scope: scope,
+             metadata: %{locale: locale, count: count}
+           ) do
+      {:ok, count}
+    end
+  end
 
-    present = MapSet.new(db)
-
-    Reference.rows()
-    |> Enum.filter(fn {key, values} ->
-      values[locale] in [nil, ""] and not MapSet.member?(present, key)
+  defp save_translations(scope, locale, translated) do
+    Enum.reduce_while(translated, {:ok, 0}, fn {key, value}, {:ok, count} ->
+      case save_filled_translation(scope, key, locale, value) do
+        {:ok, :skipped} -> {:cont, {:ok, count}}
+        {:ok, _} -> {:cont, {:ok, count + 1}}
+        error -> {:halt, error}
+      end
     end)
-    |> Enum.map(&elem(&1, 0))
+  end
+
+  defp save_filled_translation(scope, key, locale, value) do
+    row =
+      Repo.get_by(Translation, key: key, locale: locale) || %Translation{key: key, locale: locale}
+
+    if row.edited and row.value != "" do
+      {:ok, :skipped}
+    else
+      changeset =
+        row
+        |> Translation.edit_changeset(%{value: value})
+        |> Ecto.Changeset.put_change(:edited_by_id, scope.user.id)
+
+      save_translation(scope, changeset, key, locale)
+    end
+  end
+
+  @doc "One editor entry with values in CSV locale order."
+  def translation_entry(scope, key) do
+    # Use the full reference/table union, independently of the first editor page.
+    entry = list_translations(scope, %{"key" => key})
+
+    case Enum.find(entry.entries, &(&1.key == key)) do
+      nil -> {:error, :not_found}
+      entry -> {:ok, entry}
+    end
+  end
+
+  @doc "Validates a single-cell API edit and returns the complete entry."
+  def edit_translation(scope, key, attrs) do
+    changeset =
+      {%{}, %{locale: :string, value: :string}}
+      |> Ecto.Changeset.cast(attrs, [:locale, :value], empty_values: [])
+      |> Ecto.Changeset.validate_required([:locale])
+      |> Ecto.Changeset.validate_inclusion(:locale, locales())
+      |> Ecto.Changeset.validate_length(:value, max: 20_000)
+
+    changeset =
+      if Map.has_key?(attrs, "value") and is_binary(attrs["value"]),
+        do: changeset,
+        else: Ecto.Changeset.add_error(changeset, :value, "validation.required")
+
+    with {:ok, values} <- Ecto.Changeset.apply_action(changeset, :update),
+         {:ok, _} <- update_translation(scope, key, values.locale, values.value) do
+      translation_entry(scope, key)
+    end
+  end
+
+  @doc "Validates the fill locale before calling the configured AI provider."
+  def fill_translations(scope, attrs) do
+    changeset =
+      {%{}, %{locale: :string}}
+      |> Ecto.Changeset.cast(attrs, [:locale])
+      |> Ecto.Changeset.validate_required([:locale])
+      |> Ecto.Changeset.validate_inclusion(:locale, locales())
+
+    with {:ok, %{locale: locale}} <- Ecto.Changeset.apply_action(changeset, :insert),
+         {:ok, count} <- fill_missing(scope, locale) do
+      {:ok, %{count: count}}
+    end
   end
 
   ## Deploy sync

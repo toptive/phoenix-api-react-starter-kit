@@ -19,6 +19,9 @@ defmodule StarterKit.AI do
   @fal_url "https://fal.run/"
   @gemini_url "https://generativelanguage.googleapis.com/v1beta/models/"
 
+  @doc "Whether OpenRouter is configured for synchronous translation fills."
+  def configured?, do: match?({:ok, _}, key(:openrouter_api_key))
+
   @doc "Chat completion through OpenRouter. Returns `{:ok, text}`."
   def chat(messages, opts \\ []) do
     with {:ok, key} <- key(:openrouter_api_key) do
