@@ -394,6 +394,11 @@ defmodule StarterKit.I18n do
       |> Ecto.Changeset.validate_required([:locale])
       |> Ecto.Changeset.validate_inclusion(:locale, locales())
 
+    changeset =
+      if Ecto.Changeset.get_field(changeset, :locale) == default_locale(),
+        do: Ecto.Changeset.add_error(changeset, :locale, "validation.inclusion"),
+        else: changeset
+
     with {:ok, %{locale: locale}} <- Ecto.Changeset.apply_action(changeset, :insert),
          {:ok, count} <- fill_missing(scope, locale) do
       {:ok, %{count: count}}

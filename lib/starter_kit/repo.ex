@@ -25,6 +25,14 @@ defmodule StarterKit.Repo do
     defexception [:message]
   end
 
+  @doc "Escapes literal search text for a SQL LIKE pattern."
+  def escape_like(text),
+    do:
+      text
+      |> String.replace("\\", "\\\\")
+      |> String.replace("%", "\\%")
+      |> String.replace("_", "\\_")
+
   @max_per_page 100
 
   @doc """

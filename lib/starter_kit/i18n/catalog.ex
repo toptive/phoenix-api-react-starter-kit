@@ -24,12 +24,12 @@ defmodule StarterKit.I18n.Catalog do
   end
 
   @doc "Changes whenever the catalogue changes (ETag for the /locales endpoint)."
-  def version, do: :persistent_term.get({__MODULE__, :version}, "reference")
+  def version, do: :persistent_term.get({__MODULE__, :version}, content_version([]))
 
   @doc "Rebuilds the catalogue on every node."
   def broadcast_reload do
-    version = Ecto.UUID.generate()
-    load(version)
+    load()
+    version = version()
 
     unless Application.get_env(:starter_kit, :i18n_inline_reload, false),
       do: Phoenix.PubSub.broadcast(StarterKit.PubSub, @topic, {:reload, version})
@@ -40,7 +40,7 @@ defmodule StarterKit.I18n.Catalog do
     for locale <- Reference.locales(),
         do: :persistent_term.put({__MODULE__, locale}, Reference.catalog(locale))
 
-    :persistent_term.put({__MODULE__, :version}, "reference")
+    :persistent_term.put({__MODULE__, :version}, content_version([]))
   end
 
   @impl true
@@ -59,12 +59,12 @@ defmodule StarterKit.I18n.Catalog do
   end
 
   @impl true
-  def handle_info({:reload, version}, state) do
-    load(version)
+  def handle_info({:reload, _version}, state) do
+    load()
     {:noreply, state}
   end
 
-  defp load(reload_version \\ nil) do
+  defp load do
     overrides =
       try do
         Repo.all(
@@ -85,11 +85,11 @@ defmodule StarterKit.I18n.Catalog do
       :persistent_term.put({__MODULE__, locale}, catalog)
     end
 
-    version =
-      :crypto.hash(:md5, :erlang.term_to_binary(overrides))
-      |> Base.url_encode64(padding: false)
-      |> binary_part(0, 12)
+    :persistent_term.put({__MODULE__, :version}, content_version(overrides))
+  end
 
-    :persistent_term.put({__MODULE__, :version}, reload_version || version)
+  defp content_version(overrides) do
+    :crypto.hash(:sha256, :erlang.term_to_binary({Reference.rows(), overrides}))
+    |> Base.url_encode64(padding: false)
   end
 end

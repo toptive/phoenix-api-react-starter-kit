@@ -27,6 +27,8 @@ defmodule StarterKit.Legal.LegalDocumentVersion do
     |> validate_english(:bodies)
     |> validate_locale_values(:titles)
     |> validate_locale_values(:bodies)
+    |> validate_locale_sizes(:titles, 255)
+    |> validate_locale_sizes(:bodies, 100_000)
     |> validate_length(:note, max: 255)
     |> unique_constraint([:legal_document_id, :number])
   end
@@ -48,6 +50,14 @@ defmodule StarterKit.Legal.LegalDocumentVersion do
       _ ->
         changeset
     end
+  end
+
+  defp validate_locale_sizes(changeset, field, max) do
+    values = get_field(changeset, field) || %{}
+
+    if Enum.any?(Map.values(values), &(is_binary(&1) and String.length(&1) > max)),
+      do: add_error(changeset, field, "validation.length_max", count: max),
+      else: changeset
   end
 
   @doc "Title in `locale`, falling back to English."

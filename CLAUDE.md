@@ -37,18 +37,18 @@ One Mix project and one `package.json` at the root. Frontend commands run from t
 ## Layout
 
 ```
-lib/starter_kit/               domain — accounts, organizations, i18n, legal, audit, billing, privacy
-lib/starter_kit/<ctx>/         schemas, policies (exported), helper modules and workers (private)
-lib/starter_kit/*.ex           platform modules: analytics, notifications, mailer, ai, uploads, monitoring
-lib/starter_kit_web/           router, REST controllers, serializers, plugs, SEO, SPA delivery
-frontend/src/pages/            SPA pages organized by resource (kebab-case paths)
-frontend/src/components/ui/    shadcn primitives — OWNED, edit them freely
-frontend/src/components/app/   shared app components (FormStepper, FieldHelp, ConfirmDialog, …)
-frontend/src/layouts/          public, auth, app (sidebar), settings, admin
-frontend/src/api/generated/    typelizer output — never edit
-frontend/src/styles/theme.css  the only file a product edits to re-skin
-i18n/                         translations.csv → locales/*.json, scripts
-credo/, test/architecture/     our rules, executable
+lib/starter_kit/                domain — accounts, organizations, i18n, legal, audit, billing, privacy
+lib/starter_kit/<ctx>/          schemas, policies (exported), helper modules and workers (private)
+lib/starter_kit/*.ex            platform modules: analytics, notifications, mailer, ai, uploads, monitoring
+lib/starter_kit_web/            router, REST controllers, serializers, plugs, SEO, SPA delivery
+frontend/src/pages/             SPA pages organized by resource (kebab-case paths)
+frontend/src/components/ui/     shadcn primitives — OWNED, edit them freely
+frontend/src/components/app/    shared app components (FormStepper, FieldHelp, ConfirmDialog, …)
+frontend/src/layouts/           public, auth, app (sidebar), settings, admin
+frontend/src/api/generated/     typelizer output — never edit
+frontend/src/styles/theme.css   the only file a product edits to re-skin
+i18n/                           translations.csv → locales/*.json, scripts
+credo/, test/architecture/      our rules, executable
 ```
 
 ## Backend

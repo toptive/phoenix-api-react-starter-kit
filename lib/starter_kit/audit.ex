@@ -70,7 +70,7 @@ defmodule StarterKit.Audit do
     query =
       case Ecto.UUID.cast(q) do
         {:ok, id} -> where(query, [e], e.subject_id == ^id or e.actor_id == ^id)
-        :error when q != "" -> where(query, [e], ilike(e.action, ^"%#{q}%"))
+        :error when q != "" -> where(query, [e], ilike(e.action, ^"%#{Repo.escape_like(q)}%"))
         :error -> query
       end
 

@@ -583,6 +583,44 @@ defmodule StarterKit.Accounts do
     end
   end
 
+  @doc "Creates a single-use jobs ticket bound to the current superadmin session."
+  def create_jobs_ticket(%Scope{} = scope) do
+    nonce = Base.url_encode64(:crypto.strong_rand_bytes(32), padding: false)
+
+    Repo.transact(fn ->
+      with {:ok, _} <- jobs_admin(scope.session.id),
+           {:ok, _} <-
+             Repo.insert(%UserToken{
+               user_id: scope.user.id,
+               token: :crypto.hash(:sha256, nonce),
+               context: "jobs_access",
+               sent_to: scope.session.id
+             }),
+           {:ok, _} <- Audit.record("admin.jobs_dashboard_opened", scope: scope) do
+        {:ok, %{session_id: scope.session.id, nonce: nonce}}
+      end
+    end)
+  end
+
+  @doc "Atomically consumes a jobs ticket after rechecking the originating session."
+  def consume_jobs_ticket(%{session_id: id, nonce: nonce}) do
+    digest = :crypto.hash(:sha256, nonce)
+
+    Repo.transact(fn ->
+      with {:ok, _} <- jobs_admin(id),
+           {1, _} <-
+             Repo.delete_all(
+               from t in UserToken,
+                 where: t.context == "jobs_access" and t.sent_to == ^id and t.token == ^digest,
+                 where: t.inserted_at > ago(60, "second")
+             ) do
+        {:ok, id}
+      else
+        _ -> {:error, :not_found}
+      end
+    end)
+  end
+
   @doc "A live, ordinary superadmin session for the jobs dashboard."
   def jobs_admin(session_id) do
     with {:ok, id} <- Ecto.UUID.cast(session_id),
@@ -640,7 +678,13 @@ defmodule StarterKit.Accounts do
     query =
       if search == "",
         do: query,
-        else: where(query, [u], ilike(u.email, ^"%#{search}%") or ilike(u.name, ^"%#{search}%"))
+        else:
+          where(
+            query,
+            [u],
+            ilike(u.email, ^"%#{Repo.escape_like(search)}%") or
+              ilike(u.name, ^"%#{Repo.escape_like(search)}%")
+          )
 
     Repo.paginate(query, params)
   end

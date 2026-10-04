@@ -72,6 +72,7 @@ defmodule StarterKitWeb.Router do
   end
 
   pipeline :jobs_browser do
+    plug :put_secure_browser_headers, %{"content-security-policy" => "default-src 'self'"}
     plug :accepts, ["html"]
     plug :fetch_session
     plug StarterKitWeb.JobsAccess
@@ -99,13 +100,15 @@ defmodule StarterKitWeb.Router do
   end
 
   pipeline :bare do
-    plug :accepts, ["xml", "txt", "json"]
+    plug :put_secure_browser_headers, %{"content-security-policy" => "default-src 'self'"}
+    plug :accepts, ["xml", "txt", "json", "html"]
   end
 
   # Infrastructure: health check, sitemap, robots (no session, no SSR).
   scope "/", StarterKitWeb do
     pipe_through :bare
 
+    get "/admin/jobs/session", JobsSessionController, :show
     get "/health", HealthController, :show
     get "/sitemap.xml", SitemapController, :show
     get "/robots.txt", RobotsController, :show

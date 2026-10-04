@@ -8,4 +8,5 @@ export interface AppConfig {
   googleEnabled: boolean;
   emailAvailable: boolean;
   publicUrl: string;
+  jobsDashboard: boolean;
 }

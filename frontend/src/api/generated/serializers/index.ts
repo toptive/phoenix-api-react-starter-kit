@@ -17,6 +17,7 @@ export type { EmailSubscription } from "./EmailSubscription";
 export type { Flags } from "./Flags";
 export type { Invitation } from "./Invitation";
 export type { InvitationPreview } from "./InvitationPreview";
+export type { JobsAccess } from "./JobsAccess";
 export type { LegalDocument } from "./LegalDocument";
 export type { LegalDocumentVersion } from "./LegalDocumentVersion";
 export type { LegalPage } from "./LegalPage";

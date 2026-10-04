@@ -22,6 +22,7 @@ defmodule StarterKitWeb.Serializers.AppConfigSerializer do
   attribute :google_enabled, type: :boolean
   attribute :email_available, type: :boolean
   attribute :public_url, type: :string
+  attribute :jobs_dashboard, type: :boolean
 end
 
 defmodule StarterKitWeb.Serializers.BootstrapSerializer do
@@ -78,4 +79,10 @@ defmodule StarterKitWeb.Serializers.TurnstileSerializer do
   use Typelizer.Serializer
   attribute :required, type: :boolean
   attribute :site_key, type: {:nullable, :string}
+end
+
+defmodule StarterKitWeb.Serializers.JobsAccessSerializer do
+  @moduledoc "Single-use jobs dashboard browser handoff."
+  use Typelizer.Serializer
+  attribute :url, type: :string
 end

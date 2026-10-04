@@ -10,6 +10,25 @@ defmodule StarterKitWeb.JobsAccess do
   @salt "jobs-access"
   @max_age 300
 
+  @doc "Creates the browser handoff URL without setting a cookie on the API."
+  def create(scope) do
+    with {:ok, payload} <- Accounts.create_jobs_ticket(scope) do
+      ticket = Phoenix.Token.sign(Endpoint, "jobs-ticket", payload)
+      {:ok, %{url: Endpoint.url() <> "/admin/jobs/session?" <> URI.encode_query(%{ticket: ticket})}}
+    end
+  end
+
+  @doc "Consumes the signed, sixty-second browser handoff and grants dashboard access."
+  def exchange(conn, ticket) do
+    with {:ok, %{session_id: _, nonce: _} = payload} <-
+           Phoenix.Token.verify(Endpoint, "jobs-ticket", ticket, max_age: 60),
+         {:ok, session_id} <- Accounts.consume_jobs_ticket(payload) do
+      conn |> mint(session_id) |> Phoenix.Controller.redirect(to: "/admin/jobs")
+    else
+      _ -> Responses.render_error(conn, 404, :not_found)
+    end
+  end
+
   @doc "Mints a restricted HttpOnly cookie; the bearer itself never enters the browser session."
   def mint(conn, session_id) do
     token = Phoenix.Token.sign(Endpoint, @salt, session_id)

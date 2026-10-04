@@ -18,8 +18,14 @@ defmodule StarterKitWeb.ApiJobsTest do
   } do
     start_dashboard_support()
     granted = post(auth, ~p"/api/v1/admin/jobs-access", %{})
-    assert response(granted, 204) == ""
-    cookie = granted.resp_cookies["_starter_kit_jobs"]
+    url = json_response(granted, 201)["data"]["url"]
+    assert url =~ Endpoint.url() <> "/admin/jobs/session?ticket="
+    assert granted.resp_cookies == %{}
+    exchanged = get(conn |> put_req_header("accept", "text/html"), url)
+    assert redirected_to(exchanged) == "/admin/jobs"
+    cookie = exchanged.resp_cookies["_starter_kit_jobs"]
+    assert get(conn |> put_req_header("accept", "text/html"), url).status == 404
+    assert Repo.get_by!(StarterKit.Audit.AuditEvent, action: "admin.jobs_dashboard_opened")
     assert cookie.max_age == 300 and cookie.http_only and cookie.same_site == "Strict"
     assert cookie.path == "/admin/jobs"
     refute cookie.value =~ "Bearer"
@@ -69,7 +75,7 @@ defmodule StarterKitWeb.ApiJobsTest do
     issued: issued
   } do
     granted = post(auth, ~p"/api/v1/admin/jobs-access", %{})
-    token = granted.resp_cookies["_starter_kit_jobs"].value
+    token = exchange_token(conn, granted)
     assert response(delete(auth, ~p"/api/v1/auth/session"), 204) == ""
     assert get(browser_cookie(conn, token), ~p"/admin/jobs").status == 404
     assert JobsAccess.resolve_access(token) == {:forbidden, "/session/new"}
@@ -82,7 +88,7 @@ defmodule StarterKitWeb.ApiJobsTest do
     admin: admin
   } do
     granted = post(auth, ~p"/api/v1/admin/jobs-access", %{})
-    token = granted.resp_cookies["_starter_kit_jobs"].value
+    token = exchange_token(conn, granted)
     assert json_response(put(auth, ~p"/api/v1/admin/users/#{admin.id}", %{role: "user"}), 200)
     assert get(browser_cookie(conn, token), ~p"/admin/jobs").status == 404
     assert JobsAccess.resolve_access(token) == {:forbidden, "/session/new"}
@@ -91,11 +97,44 @@ defmodule StarterKitWeb.ApiJobsTest do
   test "connected jobs socket loses permission after admin logout", %{conn: conn, auth: auth} do
     start_dashboard_support()
     granted = post(auth, ~p"/api/v1/admin/jobs-access", %{})
-    token = granted.resp_cookies["_starter_kit_jobs"].value
+    token = exchange_token(conn, granted)
     {:ok, view, _html} = live(browser_cookie(conn, token), ~p"/admin/jobs")
     assert response(delete(auth, ~p"/api/v1/auth/session"), 204) == ""
     send(view.pid, :jobs_access_check)
     assert_redirect(view, "/session/new")
+  end
+
+  test "handoff refuses missing, forged, expired and revoked tickets", %{
+    conn: conn,
+    auth: auth,
+    issued: issued
+  } do
+    assert get(conn, ~p"/api/v1/bootstrap")
+           |> json_response(200)
+           |> get_in(["data", "app", "jobsDashboard"])
+
+    browser = conn |> put_req_header("accept", "text/html")
+    assert get(browser, "/admin/jobs/session").status == 404
+    assert get(browser, "/admin/jobs/session?ticket=forged").status == 404
+    url = json_response(post(auth, ~p"/api/v1/admin/jobs-access", %{}), 201)["data"]["url"]
+    ticket = URI.decode_query(URI.parse(url).query)["ticket"]
+    {:ok, payload} = Phoenix.Token.verify(Endpoint, "jobs-ticket", ticket, max_age: 60)
+
+    expired =
+      Phoenix.Token.sign(Endpoint, "jobs-ticket", payload,
+        signed_at: System.system_time(:second) - 61
+      )
+
+    assert get(browser, "/admin/jobs/session?" <> URI.encode_query(%{ticket: expired})).status ==
+             404
+
+    Repo.update!(Ecto.Changeset.change(issued.session, revoked_at: DateTime.utc_now(:second)))
+    assert get(browser, url).status == 404
+  end
+
+  defp exchange_token(conn, granted) do
+    url = json_response(granted, 201)["data"]["url"]
+    get(conn |> put_req_header("accept", "text/html"), url).resp_cookies["_starter_kit_jobs"].value
   end
 
   defp start_dashboard_support do

@@ -218,7 +218,11 @@ defmodule StarterKit.Organizations do
         select: %{organization: o, members: count(m.id)}
       )
 
-    query = if search == "", do: query, else: where(query, [o], ilike(o.name, ^"%#{search}%"))
+    query =
+      if search == "",
+        do: query,
+        else: where(query, [o], ilike(o.name, ^"%#{Repo.escape_like(search)}%"))
+
     Repo.paginate(query, params, skip_org_id: true)
   end
 
@@ -520,6 +524,7 @@ defmodule StarterKit.Organizations do
       flags: StarterKit.Flags.public(),
       turnstile: StarterKit.AbuseProtection.widget(),
       app: %{
+        jobs_dashboard: true,
         name: Application.fetch_env!(:starter_kit, :app_name),
         tenancy: mode(),
         signup_mode: Accounts.signup_mode(),

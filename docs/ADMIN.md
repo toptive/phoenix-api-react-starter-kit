@@ -28,7 +28,7 @@ For production, use the release bootstrap command described in [DEPLOY.md](DEPLO
 | POST | `/users/:id/impersonation` | 201 `AuthSession`; reason is 5..255 characters |
 | GET | `/organizations` | Paginated `AdminOrganization[]`, name search and member counts |
 | GET | `/organizations/:id` | `AdminOrganizationDetail`, memberships with users |
-| GET | `/translations` | Paginated `TranslationEntry[]`; `q`, `missing=<locale>` |
+| GET | `/translations` | Paginated `TranslationEntry[]`; `q`, `missing=<locale>`, exact `key=<key>` |
 | PUT | `/translations/:key` | `TranslationEntry`; locale/value, max 20,000 characters |
 | POST | `/translation-fills` | 201 `TranslationFill`; locale, synchronous AI fill |
 | GET | `/legal-documents` | `LegalDocument[]`, ensures terms/privacy/cookies exist |
@@ -36,7 +36,7 @@ For production, use the release bootstrap command described in [DEPLOY.md](DEPLO
 | POST | `/legal-documents/:slug/versions` | 201 `LegalDocumentVersion`, optional publish |
 | POST | `/legal-documents/:slug/versions/:number/publication` | 201 `LegalDocument`, idempotent |
 | GET | `/audit-events` | Paginated `AuditEvent[]`, UUID or action search |
-| POST | `/jobs-access` | Empty 204 and a five-minute signed jobs cookie |
+| POST | `/jobs-access` | 201 `JobsAccess { url }`, single-use browser handoff |
 
 Paginated responses put `page`, `perPage`, `total`, and `totalPages` under `meta.pagination`.
 Queries accept `page` and `perPage` (default 25, maximum 100). Text editing and sync are described
@@ -80,8 +80,8 @@ action case-insensitively. Missing/deleted actors have a null email.
 ## Oban Web
 
 The dashboard and its assets live under `/admin/jobs`, separate from the SPA. After a bearer
-request to `POST /api/v1/admin/jobs-access`, the browser opens `/admin/jobs` on the API origin.
-The API sets `_starter_kit_jobs`: signed, HttpOnly, SameSite Strict, restricted to `/admin/jobs`,
+request to `POST /api/v1/admin/jobs-access`, the browser opens the returned URL in a new tab. Issuance audits `admin.jobs_dashboard_opened`; `Bootstrap.app.jobsDashboard` is true.
+The JSON response never sets a cookie. Its URL points to `/admin/jobs/session?ticket=…` on the API origin. The signed ticket is valid for 60 seconds and is consumed atomically once. A browser GET exchanges it for a 302 to `/admin/jobs` and sets `_starter_kit_jobs`: signed, HttpOnly, SameSite Strict, restricted to `/admin/jobs`,
 Secure on production HTTPS, with a five-minute lifetime. It contains the originating session id;
 it never contains the bearer. Cookies do not authenticate the JSON API.
 
@@ -91,3 +91,5 @@ mount. Connected sockets recheck on events, navigation and once per second, so g
 working after expiry, demotion or logout. Phoenix's browser session supports LiveView CSRF only;
 a browser login session cannot grant jobs access. Oban receives the per-request CSP nonce.
 After expiry, request a new grant through the API and reopen the dashboard.
+
+Legal locale titles are capped at 255 characters and bodies at 100,000 characters. Translation filling refuses the default locale with 422 validation_failed. Provider failure returns 503 ai_unavailable. Catalogue versions are deterministic content hashes including row updated_at timestamps, so nodes serving the same catalogue share an ETag.

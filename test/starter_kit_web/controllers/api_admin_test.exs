@@ -307,7 +307,7 @@ defmodule StarterKitWeb.ApiAdminTest do
     assert Repo.get_by!(Translation, key: "nav.home", locale: "es").edited
   end
 
-  test "translation edit broadcasts the new version and repeated edits advance it", %{
+  test "translation catalogue versions are deterministic across reloads", %{
     auth: auth,
     conn: conn
   } do
@@ -326,13 +326,19 @@ defmodule StarterKitWeb.ApiAdminTest do
     assert json_response(get(conn, ~p"/api/v1/locales/es"), 200)["meta"]["version"] == first_version
 
     assert json_response(
-             put(auth, ~p"/api/v1/admin/translations/nav.home", %{locale: "es", value: "Portada"}),
+             put(auth, ~p"/api/v1/admin/translations/nav.home", %{
+               locale: "es",
+               value: "New portada"
+             }),
              200
            )
 
     assert_receive {:reload, second_version}
     :sys.get_state(I18n.Catalog)
     assert first_version != second_version
+    I18n.Catalog.broadcast_reload()
+    assert_receive {:reload, ^second_version}
+    :sys.get_state(I18n.Catalog)
 
     assert json_response(get(conn, ~p"/api/v1/locales/es"), 200)["meta"]["version"] ==
              second_version
@@ -385,6 +391,12 @@ defmodule StarterKitWeb.ApiAdminTest do
       post(auth, ~p"/api/v1/admin/translation-fills", %{}),
       "locale",
       "validation.required"
+    )
+
+    assert_field(
+      post(auth, ~p"/api/v1/admin/translation-fills", %{locale: "en"}),
+      "locale",
+      "validation.inclusion"
     )
 
     assert_field(
@@ -476,6 +488,22 @@ defmodule StarterKitWeb.ApiAdminTest do
       assert metadata == %{"literal_key" => "value"}
       assert result["meta"]["pagination"]["total"] == 1
     end
+  end
+
+  test "search treats SQL wildcards literally", %{auth: auth} do
+    user = user_fixture(name: "Literal %_ name")
+    scope = scope_fixture(user)
+    {:ok, _} = Audit.record("literal.%_action", subject: user)
+    assert [%{"id" => id}] = json_response(get(auth, ~p"/api/v1/admin/users?q=%_"), 200)["data"]
+    assert id == user.id
+
+    assert [%{"id" => id}] =
+             json_response(get(auth, ~p"/api/v1/admin/organizations?q=%_"), 200)["data"]
+
+    assert id == scope.organization.id
+
+    assert [%{"action" => "literal.%_action"}] =
+             json_response(get(auth, ~p"/api/v1/admin/audit-events?q=%_"), 200)["data"]
   end
 
   defp events(action), do: Repo.all(from e in Audit.AuditEvent, where: e.action == ^action)

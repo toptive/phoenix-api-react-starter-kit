@@ -193,6 +193,22 @@ defmodule StarterKitWeb.ApiLegalTest do
     end
   end
 
+  test "each locale has its own title and body size cap", %{auth: auth} do
+    for {field, max} <- [{:titles, 255}, {:bodies, 100_000}], locale <- ["en", "es"] do
+      values = Map.put(Map.fetch!(attrs(), field), locale, String.duplicate("x", max + 1))
+
+      assert_field(
+        post(
+          auth,
+          ~p"/api/v1/admin/legal-documents/terms/versions",
+          Map.put(attrs(), field, values)
+        ),
+        Atom.to_string(field),
+        "validation.length_max"
+      )
+    end
+  end
+
   defp attrs,
     do: %{
       titles: %{en: "Terms", es: "Términos"},

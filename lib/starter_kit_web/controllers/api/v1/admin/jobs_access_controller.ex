@@ -6,6 +6,13 @@ defmodule StarterKitWeb.Api.V1.Admin.JobsAccessController do
 
   def create(conn, _params) do
     conn = authorize!(conn, :index, User)
-    conn |> JobsAccess.mint(scope(conn).session.id) |> send_resp(204, "")
+
+    case JobsAccess.create(scope(conn)) do
+      {:ok, access} ->
+        conn |> put_status(201) |> render_data({Serializers.JobsAccessSerializer, access})
+
+      {:error, reason} ->
+        StarterKitWeb.ApiAuth.error(conn, reason)
+    end
   end
 end
