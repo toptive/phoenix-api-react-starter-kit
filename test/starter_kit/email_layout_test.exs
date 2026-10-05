@@ -81,6 +81,12 @@ defmodule StarterKit.EmailLayoutTest do
     assert optional.provider_options.message_stream == "broadcast"
   end
 
+  test "Postmark never tracks opens or links" do
+    for kind <- Notifications.kinds() do
+      assert %{track_opens: false, track_links: "None"} = build(kind, "en").provider_options
+    end
+  end
+
   test "a test-mode email carries the badge above the headline, never in the body text" do
     html = build("renewal_notice", "en", Map.put(@data, "test", true)).html_body
     [before_headline, _] = String.split(html, "<h1", parts: 2)

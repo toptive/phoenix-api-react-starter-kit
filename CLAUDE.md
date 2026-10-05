@@ -146,8 +146,6 @@ through `bin/e2e`: compile (`--warnings-as-errors`, `boundary`), format,
   `mix setup` installs the hooks. Details: [docs/GATES.md](docs/GATES.md).
 - Tests guard a risk; there is no rule that every function or page has one. Skip tests that repeat
   another test, check copy text, or only mirror the code. Keep the suite fast (about 10 s).
-- Tests guard a risk; there is no rule that every function or page has one. Skip tests that repeat
-  another test, check copy text, or only mirror the code. Keep the suite fast (about 10 s).
 - Test behavior through HTTP API requests: success, validation, unauthorized, forbidden and tenant
   isolation outcomes, plus end-to-end flows. Context tests cover real branching only; no tests of
   private helpers, standalone serializers or trivial getters. Every tenant schema has an isolation test.
