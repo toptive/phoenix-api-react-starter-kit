@@ -133,6 +133,12 @@ only the fixture session clock through `psql`. Global setup clears the mailbox o
 
 ## Testing policy
 
+Tests exist where they guard a risk: authorization, tenant isolation, money, time, security and
+multi-step flows. Do not test every function or page. Delete near-duplicates, copy-text checks,
+config-text checks and tests of legacy behavior. Do not add a test only to raise a count. A
+partitioned runner (`mix test --partitions`) was measured and is slower than one `mix test` here,
+because the suite takes about 10 s and each partition pays the boot cost again.
+
 HTTP API tests cover success, validation, unauthorized, forbidden, isolation and multi-endpoint
 flows through the real router, bearer plug, policies, database and serializers. Context tests
 cover branching behavior only. Playwright covers SPA flows against the real backend; Vitest

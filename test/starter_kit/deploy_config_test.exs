@@ -27,38 +27,6 @@ defmodule StarterKit.DeployConfigTest do
     end
   end
 
-  test "Kamal boots through bin/launch and has no pre-deploy migrate hook" do
-    deploy = File.read!("config/deploy.yml")
-
-    assert deploy =~ ~r/^  web:\n(    #.*\n)*    cmd: \/app\/bin\/launch$/m
-    refute File.exists?(".kamal/hooks/pre-deploy")
-  end
-
-  test "the emulated amd64 build passes +JMsingle to the build stage only" do
-    assert File.read!("config/deploy.yml") =~
-             ~r/^  args:\n(    #.*\n)*    ERL_FLAGS: "\+JMsingle true/m
-
-    [builder, runner] = "Dockerfile" |> File.read!() |> String.split(~r/^FROM .* AS runner$/m)
-    assert builder =~ ~r/^ARG ERL_FLAGS=""$/m
-    refute runner =~ "ERL_FLAGS"
-  end
-
-  test "every secret is read through cred and stripped of whitespace" do
-    lines =
-      ".kamal/secrets"
-      |> File.read!()
-      |> String.split("\n")
-      |> Enum.map(&String.trim_leading(&1, "# "))
-      |> Enum.filter(&(&1 =~ ~r/^[A-Z_][A-Z0-9_]*=/))
-
-    assert length(lines) > 10
-
-    for line <- lines do
-      [name, value] = String.split(line, "=", parts: 2)
-      assert value == "$(cred get starter_kit/#{name} | tr -d '[:space:]')", line
-    end
-  end
-
   @tag :tmp_dir
   test "pre-build skips the gates only when the gate stamp equals HEAD", %{tmp_dir: dir} do
     File.mkdir_p!(Path.join(dir, ".kamal/hooks"))
@@ -120,30 +88,6 @@ defmodule StarterKit.DeployConfigTest do
     end)
 
     assert File.read!("config/deploy.yml") =~ ~r/^    SIGNUP_MODE: invite$/m
-  end
-
-  test "dev reads the lane's PORT, PGDATABASE and POOL_SIZE" do
-    with_env(%{"PORT" => "4600", "PGDATABASE" => "lane_dev", "POOL_SIZE" => "2"}, fn ->
-      config = Config.Reader.read!("config/dev.exs", env: :dev)
-      repo = config[:starter_kit][StarterKit.Repo]
-      endpoint = config[:starter_kit][StarterKitWeb.Endpoint]
-
-      assert repo[:database] == "lane_dev"
-      assert repo[:pool_size] == 2
-      assert endpoint[:http][:port] == 4600
-      assert endpoint[:url][:port] == 4600
-      assert config[:starter_kit][:public_url] == "http://localhost:4600"
-    end)
-  end
-
-  test "test pool defaults to 10 and waits on a busy machine" do
-    with_env(%{"POOL_SIZE" => nil}, fn ->
-      repo = Config.Reader.read!("config/test.exs", env: :test)[:starter_kit][StarterKit.Repo]
-
-      assert repo[:pool_size] == 10
-      assert repo[:queue_target] == 5_000
-      assert repo[:queue_interval] == 20_000
-    end)
   end
 
   defp write_script(dir, name, body) do
