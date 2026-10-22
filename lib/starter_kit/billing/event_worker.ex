@@ -7,4 +7,7 @@ defmodule StarterKit.Billing.EventWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"event_id" => id}}), do: Billing.process_event(id)
+
+  @impl Oban.Worker
+  def timeout(_job), do: :timer.minutes(2)
 end

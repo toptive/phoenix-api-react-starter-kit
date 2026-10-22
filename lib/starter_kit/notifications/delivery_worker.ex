@@ -7,4 +7,7 @@ defmodule StarterKit.Notifications.DeliveryWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: args}), do: Notifications.deliver_now(args)
+
+  @impl Oban.Worker
+  def timeout(_job), do: :timer.minutes(1)
 end

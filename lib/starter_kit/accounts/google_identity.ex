@@ -17,13 +17,18 @@ defmodule StarterKit.Accounts.GoogleIdentity do
                  redirect_uri: redirect_uri,
                  grant_type: "authorization_code"
                ],
-               retry: false
+               retry: false,
+               receive_timeout: 15_000
              )
            ),
          {:ok, %{status: 200, body: %{"sub" => uid, "email" => email} = info}} <-
            Req.get(
              "https://openidconnect.googleapis.com/v1/userinfo",
-             Keyword.merge(options, headers: [{"authorization", "Bearer " <> token}], retry: false)
+             Keyword.merge(options,
+               headers: [{"authorization", "Bearer " <> token}],
+               retry: false,
+               receive_timeout: 15_000
+             )
            ),
          true <- info["email_verified"] == true || {:error, :email_not_verified} do
       {:ok, %{uid: uid, email: email, email_verified: true, name: info["name"], locale: locale}}

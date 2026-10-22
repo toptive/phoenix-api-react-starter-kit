@@ -190,9 +190,9 @@ user id.
 text `ok` (200) or `database unavailable` (503), and always sends `Cache-Control: no-store`.
 It bypasses canonical-host redirects. No authentication or cookie is involved.
 
-Oban uses `default` (5) and `marketing` (2), configurable through
+Oban uses `default` (3) and `marketing` (1), configurable through
 `OBAN_DEFAULT_CONCURRENCY` and `OBAN_MARKETING_CONCURRENCY`. Plugins are pruner (seven days),
-lifeline and cron. Delivery jobs have five attempts; Stripe event jobs have ten attempts and
+lifeline (15 min) and cron. Every worker sets `timeout/1`. Delivery jobs have five attempts; Stripe event jobs have ten attempts and
 five-minute uniqueness on event id. Cron is UTC: billing renewal sweep `0 8 * * *`, token and
 session cleanup `0 3 * * *` (sessions expired/revoked more than 30 days ago, expired user tokens,
 ended impersonations more than 90 days ago). Workers delegate one context call. Oban Web access

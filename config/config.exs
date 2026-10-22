@@ -60,10 +60,13 @@ config :starter_kit, StarterKit.Repo, migration_primary_key: [type: :binary_id]
 config :starter_kit, Oban,
   engine: Oban.Engines.Basic,
   repo: StarterKit.Repo,
-  queues: [default: 5, marketing: 2],
+  # Queue slots + 4 (web, channels, Oban itself) must fit in the Repo pool
+  # (test/architecture/otp_runtime_test.exs).
+  queues: [default: 3, marketing: 1],
   plugins: [
     {Oban.Plugins.Pruner, max_age: 7 * 24 * 60 * 60},
-    Oban.Plugins.Lifeline,
+    # Above the longest worker timeout/1, so a killed node's jobs run again within minutes.
+    {Oban.Plugins.Lifeline, rescue_after: :timer.minutes(15)},
     # Recurring work (perform/1 = one context call). A job whose feature is off returns
     # :ok at once; it never snoozes.
     {Oban.Plugins.Cron,

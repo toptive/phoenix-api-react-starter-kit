@@ -87,7 +87,8 @@ lives inside its context and its `perform/1` is ONE call (`credo/worker_perform.
 def perform(%Oban.Job{args: args}), do: Notifications.deliver_now(args)
 ```
 
-Concurrency stays below the DB pool (`POOL_SIZE` 8, jobs 5 + 2). Oban Web at `/admin/jobs`.
+Queue slots + 4 stay within the DB pool (`POOL_SIZE` 8, jobs 3 + 1). Every worker sets
+`timeout/1`; `Lifeline` rescues orphaned jobs after 15 min. Oban Web at `/admin/jobs`.
 
 ## 7. Responses and the wire
 

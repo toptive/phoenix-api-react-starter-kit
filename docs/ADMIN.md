@@ -87,7 +87,7 @@ it never contains the bearer. Cookies do not authenticate the JSON API.
 
 `StarterKitWeb.JobsAccess` verifies signature, age, bearer-session expiry/revocation, current
 superadmin role and absence of impersonation on every dashboard/asset request and LiveView
-mount. Connected sockets recheck on events, navigation and once per second, so grants stop
+mount. Connected sockets recheck on events, navigation and every 30 seconds, so grants stop
 working after expiry, demotion or logout. Phoenix's browser session supports LiveView CSRF only;
 a browser login session cannot grant jobs access. Oban receives the per-request CSP nonce.
 After expiry, request a new grant through the API and reopen the dashboard.

@@ -11,6 +11,8 @@ config :starter_kit, StarterKit.Repo,
   database: System.get_env("PGDATABASE", "starter_kit_dev"),
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
+  # Query logs flood the single logger process; REPO_LOG=debug turns them on.
+  log: if(System.get_env("REPO_LOG") == "debug", do: :debug, else: false),
   pool_size: String.to_integer(System.get_env("POOL_SIZE", "10"))
 
 # Vite serves the assets in dev (HMR). `mix phx.server` starts it as a watcher.
@@ -54,6 +56,9 @@ config :starter_kit, StarterKitWeb.Endpoint,
 
 config :starter_kit, dev_routes: true
 
+# :debug floods the single logger handler, which then blocks every logging process
+# (`:sync` mode). LOG_LEVEL=debug when you need it.
+config :logger, level: String.to_existing_atom(System.get_env("LOG_LEVEL", "info"))
 config :logger, :default_formatter, format: "[$level] $message\n"
 config :phoenix, :stacktrace_depth, 20
 config :phoenix, :plug_init_mode, :runtime
