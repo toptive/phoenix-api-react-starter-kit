@@ -102,8 +102,8 @@ env:
     # CF-Connecting-IP only through it from Cloudflare (StarterKitWeb.Plugs.ClientIp).
     # Check the subnet on the server: docker network inspect kamal
     TRUSTED_PROXY_CIDRS: 172.18.0.0/16
-    OBAN_DEFAULT_CONCURRENCY: 5
-    OBAN_MARKETING_CONCURRENCY: 2
+    OBAN_DEFAULT_CONCURRENCY: 3
+    OBAN_MARKETING_CONCURRENCY: 1
     MAIL_FROM: hello@CHANGE_ME.example.com
     MAIL_FROM_NAME: StarterKit
     # A staging or preview deploy: mail only to these addresses (comma list, *@domain).

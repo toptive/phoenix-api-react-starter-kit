@@ -9,6 +9,7 @@ defmodule StarterKitWeb.JobsAccess do
   @cookie "_starter_kit_jobs"
   @salt "jobs-access"
   @max_age 300
+  @recheck_ms 30_000
 
   @doc "Creates the browser handoff URL without setting a cookie on the API."
   def create(scope) do
@@ -81,12 +82,12 @@ defmodule StarterKitWeb.JobsAccess do
     end
   end
 
-  @doc "Rechecks permission on socket mount and every event; active sockets expire with the grant."
+  @doc "Rechecks permission on mount, every event and params change, and every 30 s; active sockets expire with the grant."
   def on_mount(:default, _params, %{"user" => token}, socket) do
     case verify(token) do
       {:ok, _} ->
         if Phoenix.LiveView.connected?(socket),
-          do: Process.send_after(self(), :jobs_access_check, 1_000)
+          do: Process.send_after(self(), :jobs_access_check, @recheck_ms)
 
         socket =
           socket
@@ -114,7 +115,7 @@ defmodule StarterKitWeb.JobsAccess do
   defp check_info(:jobs_access_check, token, socket) do
     case guard(token, socket) do
       {:cont, socket} ->
-        Process.send_after(self(), :jobs_access_check, 1_000)
+        Process.send_after(self(), :jobs_access_check, @recheck_ms)
         {:halt, socket}
 
       result ->
@@ -122,7 +123,8 @@ defmodule StarterKitWeb.JobsAccess do
     end
   end
 
-  defp check_info(_message, token, socket), do: guard(token, socket)
+  # Oban Web refreshes through handle_info every second: a DB check per refresh is too much.
+  defp check_info(_message, _token, socket), do: {:cont, socket}
 
   defp guard(token, socket) do
     case verify(token) do

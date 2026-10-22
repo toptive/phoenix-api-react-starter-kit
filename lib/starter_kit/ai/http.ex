@@ -11,7 +11,9 @@ defmodule StarterKit.AI.HTTP do
            headers: headers,
            json: body,
            receive_timeout: opts[:timeout] || 60_000,
-           retry: :transient
+           # Oban retries with backoff; in-job sleeps hold a queue slot.
+           retry: :transient,
+           max_retries: 1
          ) do
       {:ok, %Req.Response{status: status, body: body}} when status in 200..299 -> {:ok, body}
       {:ok, %Req.Response{status: status, body: body}} -> {:error, {:http, status, body}}

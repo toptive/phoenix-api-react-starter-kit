@@ -3,4 +3,7 @@ defmodule StarterKit.Accounts.TokenCleanupWorker do
   use Oban.Worker, queue: :default
   @impl true
   def perform(_job), do: StarterKit.Accounts.purge_expired_tokens()
+
+  @impl true
+  def timeout(_job), do: :timer.minutes(5)
 end

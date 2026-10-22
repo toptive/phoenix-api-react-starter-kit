@@ -89,6 +89,93 @@ credo/, test/architecture/  our rules, executable
 - JSON (`/api/v1`): `{ "data": …, "meta": … }` / `{ "error": { "code", "message", "details" } }`.
 - Unauthenticated endpoints that do work carry a rate limit (`Plugs.RateLimit`).
 
+## OTP, concurrency and runtime rules
+
+Guards: `test/architecture/otp_runtime_test.exs`. A guard sees direct calls only; the rule still
+applies through wrappers.
+
+**Capacity and pools**
+- **Pool fits the load.** Per env: Repo `pool_size` ≥ sum of Oban queue limits + 4 for web,
+  channels and Oban itself (prod: the `POOL_SIZE`/`OBAN_*_CONCURRENCY` values in `config/deploy.yml`). Why: every job and request needs a connection; a short pool turns
+  into `DBConnection` queue timeouts that look like a dead app. Set `queue_target`/`queue_interval`
+  for bursty envs. Changing a queue limit or `POOL_SIZE` default means checking both. (guard)
+- **Every external call has explicit timeouts**: `receive_timeout` (and `connect_options:
+  [timeout: …]` for slow hosts). `Req.post(url, json: body, receive_timeout: 15_000, retry: false)`,
+  never a bare `Req.post(url)`. Finch already pools per origin; give a provider its own named
+  Finch pool (`finch: StarterKit.Finch.Provider`) only when you must tune its size or count.
+  Why: a hung provider holds a request process or a queue slot until the timeout.
+- **Retries belong to Oban**, not to the HTTP client inside a job: `retry: false` (or `max_retries: 1`).
+  Why: Req's 1/2/4 s sleeps hold a queue slot and a lease while they wait.
+
+**Processes**
+- **No HTTP, LLM, file or slow DB work in `handle_call/3` of a named singleton.** Why: one slow
+  call blocks every caller of that process. Do the work in the caller, in
+  `Task.Supervisor.async_nolink(StarterKit.TaskSupervisor, fn -> … end)` + `Task.yield(task, 5_000) || Task.shutdown(task)`,
+  or in a per-entity process (`Registry` + `DynamicSupervisor`, idle timeout). (guard)
+- **A singleton that owns data answers the question, not the whole state.** Reply with the
+  query result (`{:free_slots, filters}`), not a full snapshot; keep the decoded state in the process
+  (load once in `init/1`, persist on change) or in ETS. Why: copying MBs per call and decoding
+  per read is CPU-bound and serializes readers behind writers.
+- **No `:infinity` timeouts** in `GenServer.call`, `Task.await`, `Agent.get`. Use a finite timeout
+  and handle the exit. (guard)
+- **Bounded mailboxes.** A process that receives events at a producer's rate must drop, coalesce
+  or batch (e.g. keep the latest preview, flush every 250 ms). Check `Process.info(pid, :message_queue_len)`
+  in telemetry. Never `cast` work to a singleton faster than it can finish it.
+- **ETS tables are created in `init/1` of a supervised process** (`read_concurrency: true` for
+  read-heavy, `:public, write_concurrency: true` when writers must not serialize through the
+  owner). Why: a table dies with its owner; an unsupervised owner loses the cache. (guard)
+- **Periodic work** = Oban Cron, or ONE supervised ticker (`Process.send_after` in `init/1` and
+  `handle_info`). Never a timer per request, per row or per event. Every periodic job selects
+  only the columns it needs (no large encrypted blobs to read a status).
+
+**Database**
+- **No DB transaction or row lock across HTTP/LLM calls.** Read → release → call → write in a
+  new short transaction. Why: the connection and the locks stay held for seconds, and every
+  other request waits. (guard: no HTTP client call inside `Repo.transact`/`Repo.transaction`)
+- **Locks are short and last.** A per-tenant lock (`FOR UPDATE`, hash chains, counters) is the
+  LAST statement of its transaction, or moves off the hot path (append unlocked, chain in a
+  batch job). `FOR UPDATE` only for writes, never for reads.
+- **State that must survive a restart lives in Postgres.** Process state is a cache; a
+  restarted conversation reloads from the DB and the client re-joins.
+- **Leases and claims have a short TTL and are renewed**, and released in `terminate/2`
+  (trap exits). Why: a killed process must not hold a lease for minutes.
+
+**Oban**
+- **Queues per workload.** Latency-critical work (a user waits for it) gets
+  its own queue, separate from fan-out, sync, marketing and delivery workers.
+- **Lifeline `rescue_after` ≤ 15 min** and above the longest job timeout; Pruner is on.
+  Why: a hard kill leaves jobs `executing`, and `unique` with `:executing` blocks re-inserts. (guard)
+- **No tight reschedule loops.** No `{:snooze, 1}` polling for another job's result; wait in the
+  owning process on PubSub with `receive … after`, or run the fetch inline with a timeout.
+- **Every worker sets `timeout/1`** below Lifeline's `rescue_after`. Why: a job without a
+  timeout can hold a queue slot and a connection forever.
+- `unique` periods are finite, or `states` excludes `:executing` where a re-run is safe.
+
+**PubSub, Channels, Presence**
+- **No broadcast storms.** Never broadcast per row or per token on a wide topic.
+  Ephemeral data (stream deltas, typing) goes on the narrowest topic (`<resource>:<id>`) as a
+  non-persisted payload; persist and broadcast domain events only for state changes.
+- **Channels do not re-authorize per event.** Authorize on join and on a periodic timer
+  (cached in assigns); `handle_info({:domain_event, e}, socket)` only pushes.
+- **The client debounces invalidations** (≥ 1 s trailing) and lists ignore detail-only events.
+- **Stream LLM replies to the client over the Channel**, chunked (≥ 250 ms or by sentence).
+  Persist only the final message.
+
+**Runtime and operations**
+- **Health is cheap.** `GET /health` runs no context code: at most `SELECT 1` with a ≤ 2 s
+  timeout. Never sessions, plugs with DB work, or the code reloader in front of it. (guard)
+- **Dev and QA logging is quiet.** Logger level `:info`; Repo query logs off unless `REPO_LOG=debug`;
+  log to a file, never `| tee` into a terminal. Why: the default handler is one process and
+  switches to `:sync`, so every logging process waits for stdout. A shared QA box runs
+  without the code reloader (`QA=1` or `MIX_ENV=prod`).
+- **Named nodes** (`--sname`) everywhere, so `:recon`/`observer_cli` can attach. Use
+  `:recon.proc_count(:message_queue_len, 10)`, `:recon.proc_window(:reductions, 10, 1000)` and
+  telemetry (Repo queue time, Oban job duration, Endpoint duration) before guessing.
+- **Load smoke before "done".** A realtime or chat flow is done only after a smoke run with
+  ≥ 2 users and ≥ 3 concurrent conversations: Repo queue time p95 < 50 ms, no mailbox > 1,000,
+  and reply p95 within the product target.
+- **Stop gracefully.** Watchdogs send `System.stop/0` (SIGTERM), not `kill -9`.
+
 ## Type contract
 
 Serializers (`lib/starter_kit_web/serializers`) and the router → `mix typelizer.gen` →

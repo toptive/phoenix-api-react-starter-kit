@@ -213,8 +213,8 @@ if config_env() == :prod do
 
   config :starter_kit, Oban,
     queues: [
-      default: String.to_integer(env.("OBAN_DEFAULT_CONCURRENCY") || "5"),
-      marketing: String.to_integer(env.("OBAN_MARKETING_CONCURRENCY") || "2")
+      default: String.to_integer(env.("OBAN_DEFAULT_CONCURRENCY") || "3"),
+      marketing: String.to_integer(env.("OBAN_MARKETING_CONCURRENCY") || "1")
     ]
 
   # Postmark message streams: access + transactional mail, and optional (broadcast) mail.

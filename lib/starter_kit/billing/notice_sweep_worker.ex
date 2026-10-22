@@ -7,4 +7,7 @@ defmodule StarterKit.Billing.NoticeSweepWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{}), do: Billing.send_renewal_notices()
+
+  @impl Oban.Worker
+  def timeout(_job), do: :timer.minutes(5)
 end
